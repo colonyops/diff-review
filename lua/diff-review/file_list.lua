@@ -138,6 +138,10 @@ function M.update_diff()
   local current_file = M.state.files[M.state.current_index]
   local diff = require("diff-review.diff")
   diff.show_file_diff(current_file)
+
+  -- Update comment display
+  local ui = require("diff-review.ui")
+  ui.update_comment_display()
 end
 
 -- Refresh the file list

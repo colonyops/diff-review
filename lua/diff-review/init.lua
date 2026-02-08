@@ -12,6 +12,10 @@ M.setup = function(opts)
   -- Setup configuration
   config.setup(opts)
 
+  -- Initialize UI (signs, highlights)
+  local ui = require("diff-review.ui")
+  ui.init()
+
   -- Create user commands
   vim.api.nvim_create_user_command("DiffReview", function()
     require("diff-review.layout").open()

@@ -18,6 +18,12 @@ M.defaults = {
     close = "q",
     refresh = "r",
     toggle_fold = "<Tab>",
+    -- Comment keymaps
+    add_comment = "<leader>c",
+    edit_comment = "<leader>e",
+    delete_comment = "<leader>d",
+    list_comments = "<leader>l",
+    view_all_comments = "<leader>v",
   },
 
   -- Git options

@@ -145,6 +145,17 @@ function M.setup_keymaps()
   -- Diff window keymaps
   keymap_opts.buffer = M.state.diff_buf
   vim.keymap.set("n", opts.keymaps.close, M.close, keymap_opts)
+
+  -- Comment actions (normal mode)
+  local actions = require("diff-review.actions")
+  vim.keymap.set("n", opts.keymaps.add_comment, actions.add_comment_at_cursor, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.edit_comment, actions.edit_comment_at_cursor, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.delete_comment, actions.delete_comment_at_cursor, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.list_comments, actions.list_comments, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.view_all_comments, actions.view_all_comments, keymap_opts)
+
+  -- Comment actions (visual mode)
+  vim.keymap.set("v", opts.keymaps.add_comment, actions.add_comment_for_range, keymap_opts)
 end
 
 -- Get current state
