@@ -1,0 +1,13 @@
+# Neovim
+*.swp
+*.swo
+*~
+
+# Lua
+luac.out
+
+# Testing
+.tests/
+
+# Documentation generated files
+tags
