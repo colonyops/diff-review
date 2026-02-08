@@ -4,15 +4,21 @@ local config = require("diff-review.config")
 
 -- Execute git command and return output
 local function exec_git(args)
-  local cmd = "git " .. table.concat(args, " ")
+  local cmd = "git " .. table.concat(args, " ") .. " 2>&1"
   local handle = io.popen(cmd)
   if not handle then
     return nil, "Failed to execute git command"
   end
 
   local result = handle:read("*a")
-  handle:close()
-  return result
+  local success = handle:close()
+
+  -- Check if command failed
+  if not success or result:match("^fatal:") or result:match("^error:") then
+    return nil, result
+  end
+
+  return result, nil
 end
 
 -- Parse git status to get changed files
@@ -115,7 +121,12 @@ function M.get_changed_files()
     table.insert(args, review.base .. ".." .. review.head)
   end
 
-  local output = exec_git(args)
+  local output, err = exec_git(args)
+  if err then
+    vim.notify("Git error: " .. err, vim.log.levels.ERROR)
+    return {}
+  end
+
   if not output or output == "" then
     return {}
   end
