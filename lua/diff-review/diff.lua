@@ -97,6 +97,42 @@ local function parse_diff_name_status(output)
   return files
 end
 
+-- Get line stats for all changed files
+function M.get_file_stats()
+  local reviews = require("diff-review.reviews")
+  local review = reviews.get_current()
+
+  local args = { "diff", "--numstat" }
+
+  if review and review.type == "ref" then
+    table.insert(args, review.base .. "..HEAD")
+  elseif review and review.type == "range" then
+    table.insert(args, review.base .. ".." .. review.head)
+  end
+
+  local output, err = exec_git(args)
+  if err or not output or output == "" then
+    return {}
+  end
+
+  local stats = {}
+  for line in output:gmatch("[^\r\n]+") do
+    -- Format: "additions\tdeletions\tfilepath"
+    local added, deleted, filepath = line:match("^(%S+)\t(%S+)\t(.+)$")
+    if added and deleted and filepath then
+      -- Handle binary files (marked as -)
+      local additions = tonumber(added) or 0
+      local deletions = tonumber(deleted) or 0
+      stats[filepath] = {
+        additions = additions,
+        deletions = deletions,
+      }
+    end
+  end
+
+  return stats
+end
+
 -- Get list of changed files
 function M.get_changed_files()
   -- Get current review context

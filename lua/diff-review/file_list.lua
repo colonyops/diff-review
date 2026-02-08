@@ -65,6 +65,9 @@ function M.render()
     local comments = require("diff-review.comments")
     local comment_stats = comments.stats()
 
+    -- Get file stats (additions/deletions)
+    local file_stats = diff.get_file_stats()
+
     for i, file in ipairs(M.state.files) do
       local status_info = status_icons[file.status] or { icon = "?", hl = "Normal" }
       local prefix = (i == M.state.current_index) and "> " or "  "
@@ -77,7 +80,23 @@ function M.render()
       local comment_count = comment_stats.by_file[file.path] or 0
       local comment_part = comment_count > 0 and string.format(" [%d]", comment_count) or ""
 
-      local line = string.format("%s%s %s%s%s", prefix, status_info.icon, icon_part, file.path, comment_part)
+      -- Get line changes for this file
+      local stats = file_stats[file.path]
+      local stats_part = ""
+      if stats then
+        local parts = {}
+        if stats.additions > 0 then
+          table.insert(parts, string.format("+%d", stats.additions))
+        end
+        if stats.deletions > 0 then
+          table.insert(parts, string.format("-%d", stats.deletions))
+        end
+        if #parts > 0 then
+          stats_part = " (" .. table.concat(parts, " ") .. ")"
+        end
+      end
+
+      local line = string.format("%s%s %s%s%s%s", prefix, status_info.icon, icon_part, file.path, stats_part, comment_part)
       table.insert(lines, line)
 
       local col = #prefix
@@ -105,6 +124,40 @@ function M.render()
             end_col = col + #file_icon,
             hl_group = hl_group,
           })
+        end
+      end
+
+      -- Highlight stats if present
+      if stats_part ~= "" then
+        -- Find position of stats in the line (before comment part)
+        local stats_col = #line - #comment_part - #stats_part
+
+        -- Highlight additions
+        if stats and stats.additions > 0 then
+          local add_str = "+" .. tostring(stats.additions)
+          local add_pos = line:find("%+" .. tostring(stats.additions), stats_col, true)
+          if add_pos then
+            table.insert(highlights, {
+              line = #lines - 1,
+              col = add_pos - 1,
+              end_col = add_pos - 1 + #add_str,
+              hl_group = "DiffAdd",
+            })
+          end
+        end
+
+        -- Highlight deletions
+        if stats and stats.deletions > 0 then
+          local del_str = "-" .. tostring(stats.deletions)
+          local del_pos = line:find("%-" .. tostring(stats.deletions), stats_col, true)
+          if del_pos then
+            table.insert(highlights, {
+              line = #lines - 1,
+              col = del_pos - 1,
+              end_col = del_pos - 1 + #del_str,
+              hl_group = "DiffDelete",
+            })
+          end
         end
       end
 
