@@ -81,8 +81,13 @@ end
 local function setup_keymaps(buf)
   local opts = { noremap = true, silent = true, buffer = buf }
 
-  -- Save and close
+  -- Save and close (normal mode)
   vim.keymap.set("n", "ZZ", function()
+    close_popup(true)
+  end, opts)
+
+  -- Save with Ctrl-S (both insert and normal mode)
+  vim.keymap.set({ "n", "i" }, "<C-s>", function()
     close_popup(true)
   end, opts)
 
@@ -113,6 +118,16 @@ local function setup_keymaps(buf)
     buffer = buf,
     callback = function()
       close_popup(true)
+      return true
+    end,
+  })
+
+  -- Also handle BufWritePre in case BufWriteCmd doesn't trigger
+  vim.api.nvim_create_autocmd("BufWritePre", {
+    buffer = buf,
+    callback = function()
+      close_popup(true)
+      return true
     end,
   })
 end
@@ -131,10 +146,12 @@ function M.open(initial_text, callback)
 
   -- Create buffer
   M.state.buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(M.state.buf, "DiffReviewComment://comment")
   vim.api.nvim_buf_set_option(M.state.buf, "buftype", "acwrite")
   vim.api.nvim_buf_set_option(M.state.buf, "bufhidden", "wipe")
   vim.api.nvim_buf_set_option(M.state.buf, "swapfile", false)
   vim.api.nvim_buf_set_option(M.state.buf, "filetype", "markdown")
+  vim.api.nvim_buf_set_option(M.state.buf, "modified", false)
 
   -- Set initial content
   if initial_text then
