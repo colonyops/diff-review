@@ -90,6 +90,7 @@ function M.open(review_type, base, head, pr_number)
   vim.cmd("vsplit")
   M.state.diff_win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(M.state.diff_win, M.state.diff_buf)
+  vim.api.nvim_win_set_width(M.state.diff_win, win_config.diff_width)
 
   -- Set window options for diff
   vim.api.nvim_win_set_option(M.state.diff_win, "wrap", false)

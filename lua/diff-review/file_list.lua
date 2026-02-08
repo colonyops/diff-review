@@ -12,6 +12,7 @@ end
 M.state = {
   files = {},
   current_index = 1,
+  cached_file_stats = nil,  -- Cache for file stats to avoid repeated git calls
 }
 
 -- Status icons and colors
@@ -65,8 +66,11 @@ function M.render()
     local comments = require("diff-review.comments")
     local comment_stats = comments.stats()
 
-    -- Get file stats (additions/deletions)
-    local file_stats = diff.get_file_stats()
+    -- Get file stats (additions/deletions) - use cache if available
+    if not M.state.cached_file_stats then
+      M.state.cached_file_stats = diff.get_file_stats()
+    end
+    local file_stats = M.state.cached_file_stats
 
     for i, file in ipairs(M.state.files) do
       local status_info = status_icons[file.status] or { icon = "?", hl = "Normal" }
@@ -204,6 +208,16 @@ function M.render()
 
   -- Make buffer read-only again
   vim.api.nvim_buf_set_option(state.file_list_buf, "modifiable", false)
+
+  -- Update cursor position to track selection
+  if state.file_list_win and vim.api.nvim_win_is_valid(state.file_list_win) then
+    -- Line number is 0-indexed for API but 1-indexed for cursor
+    -- Header takes 2 lines, so current file is at line (current_index + 2)
+    local cursor_line = M.state.current_index + 2
+    if cursor_line <= #lines then
+      vim.api.nvim_win_set_cursor(state.file_list_win, { cursor_line, 0 })
+    end
+  end
 end
 
 -- Navigate to next file
@@ -263,6 +277,7 @@ end
 -- Refresh the file list
 function M.refresh()
   M.state.current_index = 1
+  M.state.cached_file_stats = nil  -- Invalidate cache on refresh
   M.render()
   if #M.state.files > 0 then
     M.update_diff()
