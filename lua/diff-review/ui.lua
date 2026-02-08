@@ -92,6 +92,20 @@ function M.update_comment_display()
   local current_file = files[current_index].path
   local file_comments = comments.get_for_file(current_file)
 
+  -- Debug: check if comments exist but aren't matching
+  local all_comments = comments.get_all()
+  if #all_comments > 0 and #file_comments == 0 then
+    local comment_files = {}
+    for _, c in ipairs(all_comments) do
+      comment_files[c.file] = (comment_files[c.file] or 0) + 1
+    end
+    local msg = string.format("No comments match current file '%s'. Comments exist for:", current_file)
+    for file, count in pairs(comment_files) do
+      msg = msg .. string.format("\n  '%s' (%d)", file, count)
+    end
+    vim.notify(msg, vim.log.levels.WARN)
+  end
+
   if #file_comments == 0 then
     return
   end
