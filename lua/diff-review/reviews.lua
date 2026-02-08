@@ -77,6 +77,17 @@ end
 
 -- Set current review
 function M.set_current(review)
+  -- If already on this review, don't reload (preserves unsaved comments)
+  if M.current_review and M.current_review.id == review.id then
+    M.current_review.last_accessed = os.time()
+    return
+  end
+
+  -- Save current review before switching
+  if M.current_review then
+    M.save_current()
+  end
+
   M.current_review = review
 
   -- Load comments for this review
