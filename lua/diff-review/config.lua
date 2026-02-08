@@ -7,7 +7,7 @@ M.defaults = {
 
   -- Window layout
   layout = {
-    file_list_width = 30,  -- Width of file list panel
+    file_list_width = 45,  -- Width of file list panel
     min_width = 120,       -- Minimum total width
     min_height = 20,       -- Minimum total height
     position = "center",   -- "center", "left", "right", "top", "bottom"
