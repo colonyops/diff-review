@@ -2,6 +2,12 @@ local M = {}
 
 local config = require("diff-review.config")
 
+-- Try to load devicons, fallback to nil if not available
+local has_devicons, devicons = pcall(require, "nvim-web-devicons")
+if not has_devicons then
+  devicons = nil
+end
+
 -- State
 M.state = {
   files = {},
@@ -15,6 +21,19 @@ local status_icons = {
   D = { icon = "-", hl = "DiffDelete" },  -- Deleted
   R = { icon = "→", hl = "DiffChange" },  -- Renamed
 }
+
+-- Get file icon and color from devicons
+local function get_file_icon(filepath)
+  if not devicons then
+    return nil, nil
+  end
+
+  local filename = vim.fn.fnamemodify(filepath, ":t")
+  local extension = vim.fn.fnamemodify(filepath, ":e")
+
+  local icon, color = devicons.get_icon_color(filename, extension, { default = true })
+  return icon, color
+end
 
 -- Render the file list
 function M.render()
@@ -45,16 +64,41 @@ function M.render()
     for i, file in ipairs(M.state.files) do
       local status_info = status_icons[file.status] or { icon = "?", hl = "Normal" }
       local prefix = (i == M.state.current_index) and "> " or "  "
-      local line = string.format("%s%s %s", prefix, status_info.icon, file.path)
+
+      -- Get file icon if available
+      local file_icon, icon_color = get_file_icon(file.path)
+      local icon_part = file_icon and (file_icon .. " ") or ""
+
+      local line = string.format("%s%s %s%s", prefix, status_info.icon, icon_part, file.path)
       table.insert(lines, line)
 
-      -- Store highlight info
+      local col = #prefix
+
+      -- Highlight status icon
       table.insert(highlights, {
         line = #lines - 1,  -- 0-indexed
-        col = #prefix,
-        end_col = #prefix + #status_info.icon,
+        col = col,
+        end_col = col + #status_info.icon,
         hl_group = status_info.hl,
       })
+
+      col = col + #status_info.icon + 1  -- Move past status icon and space
+
+      -- Highlight file icon if present
+      if file_icon then
+        -- Create a dynamic highlight group for the icon color
+        if icon_color then
+          local hl_group = "DevIcon_" .. file.path:gsub("[^%w]", "_")
+          vim.api.nvim_set_hl(0, hl_group, { fg = icon_color })
+
+          table.insert(highlights, {
+            line = #lines - 1,
+            col = col,
+            end_col = col + #file_icon,
+            hl_group = hl_group,
+          })
+        end
+      end
 
       -- Highlight selected line
       if i == M.state.current_index then
