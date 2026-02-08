@@ -72,6 +72,11 @@ function M.update_comment_display()
     return
   end
 
+  -- Check if window is still valid
+  if not state.diff_win or not vim.api.nvim_win_is_valid(state.diff_win) then
+    return
+  end
+
   -- Clear existing comments
   M.clear_comments(state.diff_buf)
 
@@ -91,18 +96,35 @@ function M.update_comment_display()
     return
   end
 
+  -- Get buffer line count for validation
+  local line_count = vim.api.nvim_buf_line_count(state.diff_buf)
+
   -- Place signs and virtual text for each comment
   for _, comment in ipairs(file_comments) do
+    -- Validate line number
+    if not comment.line or comment.line < 1 or comment.line > line_count then
+      vim.notify(
+        string.format("Invalid comment line %s (buffer has %d lines)", tostring(comment.line), line_count),
+        vim.log.levels.WARN
+      )
+      goto continue
+    end
+
     local sign_name = comment.type == "range" and "DiffReviewCommentRange" or "DiffReviewComment"
 
     -- Place sign at the comment line
-    vim.fn.sign_place(
-      comment.id,
-      M.sign_group,
-      sign_name,
-      state.diff_buf,
-      { lnum = comment.line, priority = 10 }
-    )
+    local ok, err = pcall(vim.fn.sign_place, comment.id, M.sign_group, sign_name, state.diff_buf, {
+      lnum = comment.line,
+      priority = 10,
+    })
+
+    if not ok then
+      vim.notify(
+        string.format("Failed to place sign at line %d: %s", comment.line, tostring(err)),
+        vim.log.levels.WARN
+      )
+      goto continue
+    end
 
     -- Add virtual text below the line
     local formatted_text = format_comment_text(comment)
@@ -111,24 +133,30 @@ function M.update_comment_display()
       table.insert(virt_lines, { { line, "DiffReviewComment" } })
     end
 
-    vim.api.nvim_buf_set_extmark(state.diff_buf, M.ns_id, comment.line - 1, 0, {
+    ok, err = pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, comment.line - 1, 0, {
       virt_lines = virt_lines,
       virt_lines_above = false,
       hl_mode = "combine",
     })
 
+    if not ok then
+      vim.notify(
+        string.format("Failed to add virtual text at line %d: %s", comment.line, tostring(err)),
+        vim.log.levels.WARN
+      )
+    end
+
     -- If it's a range comment, place signs on all lines in range
-    if comment.type == "range" then
-      for line = comment.line_range.start + 1, comment.line_range["end"] do
-        vim.fn.sign_place(
-          comment.id * 1000 + line,  -- Unique ID for each line
-          M.sign_group,
-          sign_name,
-          state.diff_buf,
-          { lnum = line, priority = 10 }
-        )
+    if comment.type == "range" and comment.line_range then
+      for line = comment.line_range.start + 1, math.min(comment.line_range["end"], line_count) do
+        pcall(vim.fn.sign_place, comment.id * 1000 + line, M.sign_group, sign_name, state.diff_buf, {
+          lnum = line,
+          priority = 10,
+        })
       end
     end
+
+    ::continue::
   end
 end
 
