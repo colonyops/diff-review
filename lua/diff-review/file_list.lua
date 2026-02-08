@@ -61,6 +61,10 @@ function M.render()
   if #M.state.files == 0 then
     table.insert(lines, "  No changes found")
   else
+    -- Get comment counts for all files
+    local comments = require("diff-review.comments")
+    local comment_stats = comments.stats()
+
     for i, file in ipairs(M.state.files) do
       local status_info = status_icons[file.status] or { icon = "?", hl = "Normal" }
       local prefix = (i == M.state.current_index) and "> " or "  "
@@ -69,7 +73,11 @@ function M.render()
       local file_icon, icon_color = get_file_icon(file.path)
       local icon_part = file_icon and (file_icon .. " ") or ""
 
-      local line = string.format("%s%s %s%s", prefix, status_info.icon, icon_part, file.path)
+      -- Get comment count for this file
+      local comment_count = comment_stats.by_file[file.path] or 0
+      local comment_part = comment_count > 0 and string.format(" [%d]", comment_count) or ""
+
+      local line = string.format("%s%s %s%s%s", prefix, status_info.icon, icon_part, file.path, comment_part)
       table.insert(lines, line)
 
       local col = #prefix
@@ -98,6 +106,17 @@ function M.render()
             hl_group = hl_group,
           })
         end
+      end
+
+      -- Highlight comment count if present
+      if comment_count > 0 then
+        local comment_col = #line - #comment_part
+        table.insert(highlights, {
+          line = #lines - 1,
+          col = comment_col,
+          end_col = comment_col + #comment_part,
+          hl_group = "Comment",
+        })
       end
 
       -- Highlight selected line
