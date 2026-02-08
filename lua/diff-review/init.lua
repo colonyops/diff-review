@@ -17,9 +17,32 @@ M.setup = function(opts)
   ui.init()
 
   -- Create user commands
-  vim.api.nvim_create_user_command("DiffReview", function()
-    require("diff-review.layout").open()
-  end, { desc = "Open diff review window" })
+  vim.api.nvim_create_user_command("DiffReview", function(opts)
+    local parser = require("diff-review.parser")
+    local parsed = parser.parse_args(opts.args)
+
+    -- Validate
+    local valid, err = parser.validate(parsed)
+    if not valid then
+      vim.notify("Invalid arguments: " .. err, vim.log.levels.ERROR)
+      return
+    end
+
+    -- Open with parsed context
+    require("diff-review.layout").open(
+      parsed.type,
+      parsed.base,
+      parsed.head,
+      parsed.pr_number
+    )
+  end, {
+    desc = "Open diff review window",
+    nargs = "?",  -- Optional arguments
+    complete = function(arg_lead, cmd_line, cursor_pos)
+      -- TODO: Add completion for refs, branches, PRs
+      return {}
+    end,
+  })
 
   vim.api.nvim_create_user_command("DiffReviewClose", function()
     require("diff-review.layout").close()

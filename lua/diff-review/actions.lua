@@ -145,6 +145,10 @@ end
 function M.refresh_comments()
   local ui = require("diff-review.ui")
   ui.update_comment_display()
+
+  -- Auto-save comments
+  local reviews = require("diff-review.reviews")
+  reviews.save_current()
 end
 
 -- List all comments for current file

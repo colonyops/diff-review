@@ -46,10 +46,20 @@ local function get_window_config()
 end
 
 -- Open the diff review layout
-function M.open()
+function M.open(review_type, base, head, pr_number)
   if M.state.is_open then
     return
   end
+
+  -- Initialize review context
+  local reviews = require("diff-review.reviews")
+  local review = reviews.get_or_create(
+    review_type or "uncommitted",
+    base,
+    head,
+    pr_number
+  )
+  reviews.set_current(review)
 
   -- Save current window
   M.state.original_win = vim.api.nvim_get_current_win()

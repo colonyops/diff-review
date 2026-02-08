@@ -57,18 +57,42 @@ end
 
 -- Get list of changed files
 function M.get_changed_files()
-  -- Get staged and unstaged changes
-  local status_output = exec_git({ "status", "--porcelain" })
-  if not status_output or status_output == "" then
+  -- Get current review context
+  local reviews = require("diff-review.reviews")
+  local review = reviews.get_current()
+
+  if not review or review.type == "uncommitted" then
+    -- Get staged and unstaged changes
+    local status_output = exec_git({ "status", "--porcelain" })
+    if not status_output or status_output == "" then
+      return {}
+    end
+    return parse_status(status_output)
+  end
+
+  -- For ref and range reviews, use git diff --name-status
+  local args = { "diff", "--name-status" }
+
+  if review.type == "ref" then
+    table.insert(args, review.base .. "..HEAD")
+  elseif review.type == "range" then
+    table.insert(args, review.base .. ".." .. review.head)
+  end
+
+  local output = exec_git(args)
+  if not output or output == "" then
     return {}
   end
 
-  return parse_status(status_output)
+  return parse_status(output)
 end
 
 -- Get diff for a specific file
 function M.get_file_diff(file)
   local opts = config.get()
+  local reviews = require("diff-review.reviews")
+  local review = reviews.get_current()
+
   local args = { "diff" }
 
   -- Add context lines
@@ -84,22 +108,32 @@ function M.get_file_diff(file)
     table.insert(args, arg)
   end
 
+  -- Add review context
+  if review and review.type == "ref" then
+    table.insert(args, review.base .. "..HEAD")
+  elseif review and review.type == "range" then
+    table.insert(args, review.base .. ".." .. review.head)
+  end
+
   -- Add file path
   table.insert(args, "--")
   table.insert(args, file.path)
 
   local diff_output = exec_git(args)
-  if not diff_output or diff_output == "" then
-    -- Try staged changes
-    args = { "diff", "--cached" }
-    table.insert(args, "-U" .. opts.diff.context_lines)
-    if opts.diff.ignore_whitespace then
-      table.insert(args, "-w")
-    end
-    table.insert(args, "--")
-    table.insert(args, file.path)
 
-    diff_output = exec_git(args)
+  -- For uncommitted changes, also try staged if no unstaged diff
+  if not diff_output or diff_output == "" then
+    if not review or review.type == "uncommitted" then
+      args = { "diff", "--cached" }
+      table.insert(args, "-U" .. opts.diff.context_lines)
+      if opts.diff.ignore_whitespace then
+        table.insert(args, "-w")
+      end
+      table.insert(args, "--")
+      table.insert(args, file.path)
+
+      diff_output = exec_git(args)
+    end
   end
 
   return diff_output or ""
