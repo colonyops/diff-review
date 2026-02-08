@@ -28,9 +28,25 @@ end
 
 -- Add a new comment
 function M.add(file, line, text, line_range)
+  local new_id = generate_id()
+
+  -- Safety check: ensure ID is unique
+  local max_attempts = 1000
+  local attempts = 0
+  while M.get(new_id) and attempts < max_attempts do
+    M.next_id = M.next_id + 1
+    new_id = generate_id()
+    attempts = attempts + 1
+  end
+
+  if attempts >= max_attempts then
+    vim.notify("Failed to generate unique comment ID", vim.log.levels.ERROR)
+    return nil
+  end
+
   local timestamp = os.time()
   local comment = {
-    id = generate_id(),
+    id = new_id,
     file = file,
     line = line,
     text = text,

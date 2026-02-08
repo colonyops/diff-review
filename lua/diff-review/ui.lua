@@ -99,30 +99,44 @@ function M.update_comment_display()
   -- Get buffer line count for validation
   local line_count = vim.api.nvim_buf_line_count(state.diff_buf)
 
+  -- Track successfully placed comments
+  local placed_count = 0
+  local failed_comments = {}
+
   -- Place signs and virtual text for each comment
   for _, comment in ipairs(file_comments) do
     -- Validate line number
-    if not comment.line or comment.line < 1 or comment.line > line_count then
+    if not comment.line or comment.line < 1 then
+      table.insert(failed_comments, {
+        id = comment.id,
+        reason = string.format("Invalid line number: %s", tostring(comment.line))
+      })
+      goto continue
+    end
+
+    -- Clamp line number to buffer bounds instead of rejecting
+    local display_line = math.min(comment.line, line_count)
+    if display_line ~= comment.line then
       vim.notify(
-        string.format("Invalid comment line %s (buffer has %d lines)", tostring(comment.line), line_count),
+        string.format("Comment #%d line %d out of bounds, clamped to %d", comment.id, comment.line, display_line),
         vim.log.levels.WARN
       )
-      goto continue
+      comment.line = display_line
     end
 
     local sign_name = comment.type == "range" and "DiffReviewCommentRange" or "DiffReviewComment"
 
-    -- Place sign at the comment line
+    -- Place sign at the comment line (using display_line which is clamped)
     local ok, err = pcall(vim.fn.sign_place, comment.id, M.sign_group, sign_name, state.diff_buf, {
-      lnum = comment.line,
+      lnum = display_line,
       priority = 10,
     })
 
     if not ok then
-      vim.notify(
-        string.format("Failed to place sign at line %d: %s", comment.line, tostring(err)),
-        vim.log.levels.WARN
-      )
+      table.insert(failed_comments, {
+        id = comment.id,
+        reason = string.format("Sign placement failed: %s", tostring(err))
+      })
       goto continue
     end
 
@@ -134,32 +148,32 @@ function M.update_comment_display()
     end
 
     -- For range comments, display at the end of the range
-    local display_line = comment.line
+    local virt_display_line = display_line
     if comment.type == "range" and comment.line_range then
-      display_line = comment.line_range["end"]
+      virt_display_line = math.min(comment.line_range["end"], line_count)
     end
 
-    -- Validate display line
-    if display_line < 1 or display_line > line_count then
-      goto continue
-    end
-
-    ok, err = pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, display_line - 1, 0, {
+    -- Virtual text uses 0-indexed line numbers
+    ok, err = pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, virt_display_line - 1, 0, {
       virt_lines = virt_lines,
       virt_lines_above = false,
       hl_mode = "combine",
     })
 
     if not ok then
-      vim.notify(
-        string.format("Failed to add virtual text at line %d: %s", comment.line, tostring(err)),
-        vim.log.levels.WARN
-      )
+      table.insert(failed_comments, {
+        id = comment.id,
+        reason = string.format("Virtual text failed: %s", tostring(err))
+      })
+      goto continue
     end
 
     -- If it's a range comment, place signs on all lines in range
     if comment.type == "range" and comment.line_range then
-      for line = comment.line_range.start + 1, math.min(comment.line_range["end"], line_count) do
+      local range_start = math.max(comment.line_range.start + 1, 1)
+      local range_end = math.min(comment.line_range["end"], line_count)
+
+      for line = range_start, range_end do
         pcall(vim.fn.sign_place, comment.id * 1000 + line, M.sign_group, sign_name, state.diff_buf, {
           lnum = line,
           priority = 10,
@@ -167,7 +181,18 @@ function M.update_comment_display()
       end
     end
 
+    placed_count = placed_count + 1
+
     ::continue::
+  end
+
+  -- Report any failures
+  if #failed_comments > 0 then
+    local msg = string.format("Failed to display %d comment(s):", #failed_comments)
+    for _, failed in ipairs(failed_comments) do
+      msg = msg .. string.format("\n  Comment #%d: %s", failed.id, failed.reason)
+    end
+    vim.notify(msg, vim.log.levels.WARN)
   end
 end
 
