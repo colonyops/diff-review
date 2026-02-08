@@ -152,6 +152,8 @@ function M.setup_keymaps()
   vim.keymap.set("n", opts.keymaps.prev_file, require("diff-review.file_list").prev_file, keymap_opts)
   vim.keymap.set("n", opts.keymaps.select_file, require("diff-review.file_list").select_file, keymap_opts)
   vim.keymap.set("n", opts.keymaps.refresh, require("diff-review.file_list").refresh, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.toggle_fold, require("diff-review.file_list").toggle_fold, keymap_opts)
+  vim.keymap.set("n", "<leader>t", require("diff-review.file_list").toggle_view_mode, keymap_opts)
 
   -- Diff window keymaps
   keymap_opts.buffer = M.state.diff_buf
