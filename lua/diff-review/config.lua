@@ -2,6 +2,9 @@ local M = {}
 
 -- Default configuration
 M.defaults = {
+  -- Fuzzy finder for review switching
+  picker = "snacks",       -- "snacks" | "telescope"
+
   -- Window layout
   layout = {
     file_list_width = 40,  -- Width of file list panel
@@ -49,6 +52,11 @@ M.defaults = {
     context_lines = 3,     -- Lines of context around changes
     ignore_whitespace = false,
     syntax_highlighting = true,
+  },
+
+  -- Persistence options
+  persistence = {
+    auto_save = true,      -- Auto-save comments after each change
   },
 }
 

@@ -152,8 +152,15 @@ end
 
 -- Auto-save on comment changes
 function M.setup_auto_save()
-  -- Save comments when they change
-  -- This would be called after any comment operation
+  local config = require("diff-review.config")
+  if not config.get().persistence.auto_save then
+    return
+  end
+
+  -- Register auto-save hook with comments module
+  comments.set_auto_save_hook(function()
+    M.save_current()
+  end)
 end
 
 return M

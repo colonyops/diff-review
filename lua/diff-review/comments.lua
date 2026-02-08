@@ -4,6 +4,9 @@ local M = {}
 M.comments = {}
 M.next_id = 1
 
+-- Auto-save hook (set by reviews module)
+local auto_save_hook = nil
+
 -- Comment structure:
 -- {
 --   id = number,
@@ -41,6 +44,12 @@ function M.add(file, line, text, line_range)
   end
 
   table.insert(M.comments, comment)
+
+  -- Trigger auto-save if enabled
+  if auto_save_hook then
+    auto_save_hook()
+  end
+
   return comment
 end
 
@@ -89,6 +98,12 @@ function M.update(id, new_text)
 
   comment.text = new_text
   comment.updated_at = os.time()
+
+  -- Trigger auto-save if enabled
+  if auto_save_hook then
+    auto_save_hook()
+  end
+
   return true
 end
 
@@ -97,6 +112,12 @@ function M.delete(id)
   for i, comment in ipairs(M.comments) do
     if comment.id == id then
       table.remove(M.comments, i)
+
+      -- Trigger auto-save if enabled
+      if auto_save_hook then
+        auto_save_hook()
+      end
+
       return true
     end
   end
@@ -149,6 +170,11 @@ function M.stats()
   end
 
   return stats
+end
+
+-- Set auto-save hook
+function M.set_auto_save_hook(hook)
+  auto_save_hook = hook
 end
 
 return M
