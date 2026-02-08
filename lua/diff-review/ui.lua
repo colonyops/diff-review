@@ -106,13 +106,16 @@ function M.update_comment_display()
 
     -- Add virtual text below the line
     local formatted_text = format_comment_text(comment)
-    for i, line in ipairs(formatted_text) do
-      vim.api.nvim_buf_set_extmark(state.diff_buf, M.ns_id, comment.line - 1 + i, 0, {
-        virt_text = { { line, "DiffReviewComment" } },
-        virt_text_pos = "eol",
-        hl_mode = "combine",
-      })
+    local virt_lines = {}
+    for _, line in ipairs(formatted_text) do
+      table.insert(virt_lines, { { line, "DiffReviewComment" } })
     end
+
+    vim.api.nvim_buf_set_extmark(state.diff_buf, M.ns_id, comment.line - 1, 0, {
+      virt_lines = virt_lines,
+      virt_lines_above = false,
+      hl_mode = "combine",
+    })
 
     -- If it's a range comment, place signs on all lines in range
     if comment.type == "range" then
