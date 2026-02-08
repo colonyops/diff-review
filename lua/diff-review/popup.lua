@@ -158,12 +158,8 @@ function M.open(initial_text, callback)
     local lines = vim.split(initial_text, "\n")
     vim.api.nvim_buf_set_lines(M.state.buf, 0, -1, false, lines)
   else
-    -- Add helpful comment
-    vim.api.nvim_buf_set_lines(M.state.buf, 0, -1, false, {
-      "# Add your comment here",
-      "",
-      "",
-    })
+    -- Start with empty buffer
+    vim.api.nvim_buf_set_lines(M.state.buf, 0, -1, false, { "" })
   end
 
   -- Create window
@@ -177,14 +173,8 @@ function M.open(initial_text, callback)
   -- Setup keymaps
   setup_keymaps(M.state.buf)
 
-  -- Position cursor
-  if initial_text then
-    -- Start at the beginning
-    vim.api.nvim_win_set_cursor(M.state.win, { 1, 0 })
-  else
-    -- Skip the header line
-    vim.api.nvim_win_set_cursor(M.state.win, { 3, 0 })
-  end
+  -- Position cursor at the beginning
+  vim.api.nvim_win_set_cursor(M.state.win, { 1, 0 })
 
   -- Enter insert mode
   vim.cmd("startinsert")

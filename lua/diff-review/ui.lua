@@ -126,14 +126,25 @@ function M.update_comment_display()
       goto continue
     end
 
-    -- Add virtual text below the line
+    -- Add virtual text below the line (or end of range for range comments)
     local formatted_text = format_comment_text(comment)
     local virt_lines = {}
     for _, line in ipairs(formatted_text) do
       table.insert(virt_lines, { { line, "DiffReviewComment" } })
     end
 
-    ok, err = pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, comment.line - 1, 0, {
+    -- For range comments, display at the end of the range
+    local display_line = comment.line
+    if comment.type == "range" and comment.line_range then
+      display_line = comment.line_range["end"]
+    end
+
+    -- Validate display line
+    if display_line < 1 or display_line > line_count then
+      goto continue
+    end
+
+    ok, err = pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, display_line - 1, 0, {
       virt_lines = virt_lines,
       virt_lines_above = false,
       hl_mode = "combine",
