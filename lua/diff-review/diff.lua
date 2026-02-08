@@ -55,6 +55,42 @@ local function parse_status(status_output)
   return files
 end
 
+-- Parse git diff --name-status output
+local function parse_diff_name_status(output)
+  local files = {}
+
+  for line in output:gmatch("[^\r\n]+") do
+    -- Format: "M\tpath" or "R100\told_path\tnew_path"
+    local parts = vim.split(line, "\t")
+    if #parts >= 2 then
+      local status = parts[1]:sub(1, 1)  -- Get first character (M, A, D, R, etc.)
+      local path = parts[2]
+
+      -- Handle renames (R\told_path\tnew_path)
+      if status == "R" and #parts >= 3 then
+        path = parts[3]
+      end
+
+      -- Map status codes
+      local status_map = {
+        M = "M",  -- Modified
+        A = "A",  -- Added
+        D = "D",  -- Deleted
+        R = "R",  -- Renamed
+        C = "M",  -- Copied (treat as modified)
+        T = "M",  -- Type changed
+      }
+
+      table.insert(files, {
+        status = status_map[status] or "M",
+        path = path,
+      })
+    end
+  end
+
+  return files
+end
+
 -- Get list of changed files
 function M.get_changed_files()
   -- Get current review context
@@ -84,7 +120,7 @@ function M.get_changed_files()
     return {}
   end
 
-  return parse_status(output)
+  return parse_diff_name_status(output)
 end
 
 -- Get diff for a specific file
