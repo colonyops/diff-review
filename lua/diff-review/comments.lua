@@ -72,7 +72,7 @@ function M.get_at_line(file, line)
     if comment.file == file then
       if comment.type == "single" and comment.line == line then
         table.insert(line_comments, comment)
-      elseif comment.type == "range" and line >= comment.line_range.start and line <= comment.line_range.end then
+      elseif comment.type == "range" and line >= comment.line_range.start and line <= comment.line_range["end"] then
         table.insert(line_comments, comment)
       end
     end
