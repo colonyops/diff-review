@@ -147,6 +147,18 @@ function M.open(review_type, base, head, pr_number)
 
   -- Load file list
   require("diff-review.file_list").render()
+
+  -- Validate layout actually opened correctly
+  vim.defer_fn(function()
+    if not vim.api.nvim_win_is_valid(M.state.file_list_win) or
+       not vim.api.nvim_win_is_valid(M.state.diff_win) then
+      vim.notify(
+        "diff-review: Layout failed to open correctly. Try closing other tabs/buffers first.",
+        vim.log.levels.WARN
+      )
+      M.state.is_open = false
+    end
+  end, 50)
 end
 
 -- Close the diff review layout
@@ -354,6 +366,19 @@ end
 -- Get current state
 function M.get_state()
   return M.state
+end
+
+-- Force clean open by ensuring we're in a good state first
+function M.force_clean_open(review_type, base, head, pr_number)
+  -- Close if already open
+  if M.state.is_open then
+    M.close()
+  end
+
+  -- Give time for close to complete
+  vim.defer_fn(function()
+    M.open(review_type, base, head, pr_number)
+  end, 100)
 end
 
 return M
