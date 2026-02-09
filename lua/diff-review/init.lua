@@ -95,6 +95,10 @@ M.setup = function(opts)
     require("diff-review.layout").close()
   end, { desc = "Close diff review window" })
 
+  vim.api.nvim_create_user_command("DiffReviewToggle", function()
+    require("diff-review.layout").toggle()
+  end, { desc = "Toggle diff review window (preserves state)" })
+
   vim.api.nvim_create_user_command("DiffReviewList", function()
     require("diff-review.picker").show()
   end, { desc = "List and switch between active reviews" })
