@@ -12,6 +12,9 @@ M.state = {
   original_win = nil,
 }
 
+-- Last review state for restoration
+M.last_review_state = nil
+
 -- Create a new scratch buffer
 local function create_scratch_buffer(name)
   -- Check if buffer with this name already exists
@@ -152,6 +155,41 @@ function M.close()
     return
   end
 
+  -- Capture state before closing
+  local reviews = require("diff-review.reviews")
+  local review = reviews.get_current()
+  local file_list = require("diff-review.file_list")
+
+  if review then
+    -- Capture cursor and scroll position
+    local cursor_pos, scroll_pos
+    if M.state.diff_win and vim.api.nvim_win_is_valid(M.state.diff_win) then
+      pcall(function()
+        cursor_pos = vim.api.nvim_win_get_cursor(M.state.diff_win)
+        scroll_pos = vim.fn.getwininfo(M.state.diff_win)[1].topline
+      end)
+    end
+
+    M.last_review_state = {
+      review_context = {
+        id = review.id,
+        type = review.type,
+        base = review.base,
+        head = review.head,
+        pr_number = review.pr_number,
+      },
+      file_index = file_list.state.current_index,
+      cursor_pos = cursor_pos,
+      scroll_pos = scroll_pos,
+      view_mode = file_list.state.view_mode,
+      saved_at = os.time(),
+    }
+
+    -- Persist to disk
+    local persistence = require("diff-review.persistence")
+    persistence.save_global_session(M.last_review_state)
+  end
+
   local file_list_buf = M.state.file_list_buf
   local diff_buf = M.state.diff_buf
   local file_list_win = M.state.file_list_win
@@ -191,12 +229,80 @@ function M.close()
   M.state.original_win = nil
 end
 
+-- Restore previous review session
+function M.restore()
+  -- Load state from memory or disk
+  local state = M.last_review_state
+  if not state then
+    local persistence = require("diff-review.persistence")
+    state = persistence.load_global_session()
+  end
+
+  if not state or not state.review_context then
+    vim.notify("No previous review session to restore", vim.log.levels.INFO)
+    return false
+  end
+
+  -- Check staleness (notify if older than 24 hours)
+  local age = os.time() - (state.saved_at or 0)
+  if age > 86400 then
+    vim.notify(
+      string.format("Restoring review session from %d hours ago", math.floor(age / 3600)),
+      vim.log.levels.INFO
+    )
+  end
+
+  -- Open layout with saved review context
+  local reviews = require("diff-review.reviews")
+  local ctx = state.review_context
+
+  if ctx.type == "pr" then
+    reviews.start_pr_review(ctx.pr_number)
+  elseif ctx.type == "ref" then
+    reviews.start_ref_review(ctx.base)
+  elseif ctx.type == "range" then
+    reviews.start_range_review(ctx.base, ctx.head)
+  elseif ctx.type == "uncommitted" then
+    reviews.start_uncommitted_review()
+  else
+    vim.notify("Unknown review type: " .. ctx.type, vim.log.levels.ERROR)
+    return false
+  end
+
+  M.open()
+
+  -- Restore view mode
+  local file_list = require("diff-review.file_list")
+  if state.view_mode and state.view_mode ~= file_list.state.view_mode then
+    file_list.toggle_view_mode()
+  end
+
+  -- Restore file selection
+  if state.file_index and state.file_index > 0 then
+    file_list.state.current_index = state.file_index
+    file_list.render()
+    file_list.update_diff()
+  end
+
+  -- Restore cursor and scroll position
+  if state.cursor_pos and M.state.diff_win and vim.api.nvim_win_is_valid(M.state.diff_win) then
+    pcall(function()
+      vim.api.nvim_win_set_cursor(M.state.diff_win, state.cursor_pos)
+      if state.scroll_pos then
+        vim.fn.winrestview({ topline = state.scroll_pos })
+      end
+    end)
+  end
+
+  return true
+end
+
 -- Toggle the layout
 function M.toggle()
   if M.state.is_open then
     M.close()
   else
-    M.open()
+    M.restore()
   end
 end
 
