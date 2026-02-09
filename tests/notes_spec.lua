@@ -46,6 +46,20 @@ describe("notes", function()
       assert.is_not_nil(note.updated_at)
       assert.equals(note.created_at, note.updated_at)
     end)
+
+    it("should reject invalid line numbers", function()
+      local note1 = notes.add("test.lua", 0, "Invalid line 0")
+      assert.is_nil(note1)
+
+      local note2 = notes.add("test.lua", -5, "Negative line")
+      assert.is_nil(note2)
+
+      local note3 = notes.add("test.lua", 1.5, "Fractional line")
+      assert.is_nil(note3)
+
+      local note4 = notes.add("test.lua", "10", "String line")
+      assert.is_nil(note4)
+    end)
   end)
 
   describe("get", function()

@@ -3,6 +3,7 @@ local M = {}
 
 local notes = require("diff-review.notes")
 local note_mode = require("diff-review.note_mode")
+local clipboard_utils = require("diff-review.clipboard_utils")
 
 -- Format note with line information
 local function format_note_line(note)
@@ -146,16 +147,20 @@ function M.export_notes_with_context(set_name)
     -- Try to read file content for context
     local file_content = {}
     local ok, result = pcall(function()
-      local f = io.open(file, "r")
-      if f then
-        for line in f:lines() do
-          table.insert(file_content, line)
-        end
-        f:close()
-        return true
+      local f, err = io.open(file, "r")
+      if not f then
+        error(string.format("Cannot open file: %s", err or "unknown error"))
       end
-      return false
+      for line in f:lines() do
+        table.insert(file_content, line)
+      end
+      f:close()
+      return true
     end)
+
+    if not ok then
+      vim.notify(string.format("Failed to read %s for code context: %s", file, tostring(result)), vim.log.levels.WARN)
+    end
 
     -- Sort notes by line number
     table.sort(by_file[file], function(a, b)
@@ -209,7 +214,7 @@ function M.export_notes_with_context(set_name)
       table.insert(lines, "")
 
       -- Add note text
-      table.insert(lines, string.format("💬 %s", note.text))
+      table.insert(lines, string.format("> %s", note.text))
       table.insert(lines, "")
       table.insert(lines, "---")
       table.insert(lines, "")
@@ -232,38 +237,7 @@ end
 
 -- Copy to clipboard
 function M.copy_to_clipboard(content)
-  if not content then
-    return false, "No content to copy"
-  end
-
-  -- Try different clipboard commands
-  local clip_cmd
-  if vim.fn.has("clipboard") == 1 then
-    -- Use Neovim's clipboard provider
-    vim.fn.setreg("+", content)
-    return true
-  elseif vim.fn.executable("pbcopy") == 1 then
-    -- macOS
-    clip_cmd = "pbcopy"
-  elseif vim.fn.executable("xclip") == 1 then
-    -- Linux (X11)
-    clip_cmd = "xclip -selection clipboard"
-  elseif vim.fn.executable("wl-copy") == 1 then
-    -- Linux (Wayland)
-    clip_cmd = "wl-copy"
-  else
-    return false, "No clipboard utility available"
-  end
-
-  -- Write to clipboard using external command
-  local handle = io.popen(clip_cmd, "w")
-  if not handle then
-    return false, "Failed to open clipboard command"
-  end
-  handle:write(content)
-  handle:close()
-
-  return true
+  return clipboard_utils.copy_to_clipboard(content)
 end
 
 return M

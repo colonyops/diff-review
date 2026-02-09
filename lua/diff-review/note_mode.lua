@@ -106,8 +106,9 @@ local function render_current_buffer()
   end
 
   -- Convert to relative path if in git repo
-  local git_root = vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"):gsub("\n", "")
-  if vim.v.shell_error == 0 and git_root ~= "" then
+  local git_utils = require("diff-review.git_utils")
+  local git_root, err = git_utils.get_git_root()
+  if git_root then
     filepath = vim.fn.fnamemodify(filepath, ":.")
   end
 

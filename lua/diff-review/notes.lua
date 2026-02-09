@@ -29,6 +29,12 @@ end
 
 -- Add a new note
 function M.add(file, line, text, line_range, set_name)
+  -- Validate line number
+  if type(line) ~= "number" or line < 1 or line ~= math.floor(line) then
+    vim.notify(string.format("Invalid line number: %s", tostring(line)), vim.log.levels.ERROR)
+    return nil
+  end
+
   local new_id = generate_id()
 
   -- Safety check: ensure ID is unique
@@ -65,7 +71,10 @@ function M.add(file, line, text, line_range, set_name)
 
   -- Trigger auto-save if enabled
   if auto_save_hook then
-    auto_save_hook()
+    local ok, err = pcall(auto_save_hook)
+    if not ok then
+      vim.notify(string.format("Auto-save failed: %s", tostring(err)), vim.log.levels.ERROR)
+    end
   end
 
   return note
@@ -145,7 +154,10 @@ function M.update(id, new_text)
 
   -- Trigger auto-save if enabled
   if auto_save_hook then
-    auto_save_hook()
+    local ok, err = pcall(auto_save_hook)
+    if not ok then
+      vim.notify(string.format("Auto-save failed: %s", tostring(err)), vim.log.levels.ERROR)
+    end
   end
 
   return true
@@ -220,7 +232,10 @@ function M.clear_set(set_name)
 
   -- Trigger auto-save if enabled
   if auto_save_hook then
-    auto_save_hook()
+    local ok, err = pcall(auto_save_hook)
+    if not ok then
+      vim.notify(string.format("Auto-save failed: %s", tostring(err)), vim.log.levels.ERROR)
+    end
   end
 
   return count

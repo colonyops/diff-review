@@ -1,27 +1,22 @@
 local M = {}
 
+local git_utils = require("diff-review.git_utils")
+local storage_utils = require("diff-review.storage_utils")
+
 -- Get notes storage directory
 local function get_notes_dir()
-  -- Try to find git root
-  local git_dir = vim.fn.system("git rev-parse --git-dir 2>/dev/null"):gsub("\n", "")
-
-  local base_dir
-  if vim.v.shell_error ~= 0 or git_dir == "" then
-    -- Fallback to current directory
-    base_dir = vim.fn.getcwd() .. "/.diff-review"
-  else
-    base_dir = git_dir .. "/diff-review"
-  end
-
-  return base_dir .. "/notes"
+  local storage_dir = git_utils.get_storage_dir()
+  return storage_dir .. "/notes"
 end
 
 -- Ensure notes storage directory exists
 local function ensure_notes_dir()
   local dir = get_notes_dir()
 
-  if vim.fn.isdirectory(dir) == 0 then
-    vim.fn.mkdir(dir, "p")
+  local ok, err = storage_utils.ensure_dir(dir)
+  if not ok then
+    vim.notify(err, vim.log.levels.ERROR)
+    return nil
   end
 
   return dir
@@ -45,17 +40,11 @@ function M.save(notes, set_name)
     notes = notes,
   }
 
-  local json = vim.fn.json_encode(data)
-
-  -- Write to file
-  local file = io.open(path, "w")
-  if not file then
-    vim.notify("Failed to save notes: " .. path, vim.log.levels.ERROR)
+  local ok, err = storage_utils.write_json(path, data)
+  if not ok then
+    vim.notify(string.format("Failed to save notes: %s", err), vim.log.levels.ERROR)
     return false
   end
-
-  file:write(json)
-  file:close()
 
   return true
 end
@@ -65,24 +54,14 @@ function M.load(set_name)
   local path = get_storage_path(set_name)
 
   -- Check if file exists
-  if vim.fn.filereadable(path) == 0 then
+  if not storage_utils.file_exists(path) then
     return nil
   end
 
-  -- Read file
-  local file = io.open(path, "r")
-  if not file then
-    vim.notify("Failed to load notes: " .. path, vim.log.levels.ERROR)
-    return nil
-  end
-
-  local content = file:read("*a")
-  file:close()
-
-  -- Parse JSON
-  local ok, data = pcall(vim.fn.json_decode, content)
-  if not ok or not data then
-    vim.notify("Failed to parse notes file: " .. path, vim.log.levels.ERROR)
+  -- Read and parse JSON
+  local data, err = storage_utils.read_json(path)
+  if not data then
+    vim.notify(string.format("Failed to load notes: %s", err), vim.log.levels.ERROR)
     return nil
   end
 
@@ -154,8 +133,10 @@ end
 -- Ensure global storage directory exists
 local function ensure_global_storage_dir()
   local dir = get_global_storage_dir()
-  if vim.fn.isdirectory(dir) == 0 then
-    vim.fn.mkdir(dir, "p")
+  local ok, err = storage_utils.ensure_dir(dir)
+  if not ok then
+    vim.notify(err, vim.log.levels.ERROR)
+    return nil
   end
   return dir
 end
@@ -177,17 +158,11 @@ function M.save_global_session(state)
     state = state,
   }
 
-  local json = vim.fn.json_encode(data)
-
-  -- Write to file with error handling
-  local file, err = io.open(path, "w")
-  if not file then
-    vim.notify("Failed to save note session: " .. (err or "unknown error"), vim.log.levels.ERROR)
+  local ok, err = storage_utils.write_json(path, data)
+  if not ok then
+    vim.notify(string.format("Failed to save note session: %s", err), vim.log.levels.ERROR)
     return false
   end
-
-  file:write(json)
-  file:close()
 
   return true
 end
@@ -197,29 +172,23 @@ function M.load_global_session()
   local path = get_global_note_session_path()
 
   -- Check if file exists
-  if vim.fn.filereadable(path) == 0 then
+  if not storage_utils.file_exists(path) then
     return nil
   end
 
-  -- Read file
-  local file, err = io.open(path, "r")
-  if not file then
-    vim.notify("Failed to load note session: " .. (err or "unknown error"), vim.log.levels.WARN)
-    return nil
-  end
-
-  local content = file:read("*a")
-  file:close()
-
-  -- Handle empty file
-  if not content or content == "" then
-    return nil
-  end
-
-  -- Parse JSON with error handling
-  local ok, data = pcall(vim.fn.json_decode, content)
-  if not ok or not data or type(data) ~= "table" then
+  -- Read and parse JSON
+  local data, err = storage_utils.read_json(path)
+  if not data then
+    -- Empty file or parse error - warn but don't error
+    if string.match(err, "Empty file") then
+      return nil
+    end
     vim.notify("Corrupted note session file, ignoring", vim.log.levels.WARN)
+    return nil
+  end
+
+  if type(data) ~= "table" then
+    vim.notify("Invalid note session data, ignoring", vim.log.levels.WARN)
     return nil
   end
 

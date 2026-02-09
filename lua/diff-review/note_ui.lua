@@ -3,6 +3,11 @@ local M = {}
 local notes = require("diff-review.notes")
 local config = require("diff-review.config")
 
+-- Priority constants for signs and extmarks
+local SIGN_PRIORITY = 10
+local VIRT_TEXT_PRIORITY = 100
+local LINE_HIGHLIGHT_PRIORITY = 200
+
 -- Separate namespace for notes (different from diff review comments)
 M.ns_id = vim.api.nvim_create_namespace("diff_review_notes")
 M.cursor_ns_id = vim.api.nvim_create_namespace("diff_review_note_cursor")
@@ -170,10 +175,13 @@ function M.update_display(bufnr, filepath, set_name)
     local sign_name = note.type == "range" and "DiffReviewNoteRange" or "DiffReviewNote"
 
     -- Place sign at the note line
-    pcall(vim.fn.sign_place, note.id, M.sign_group, sign_name, bufnr, {
+    local ok, err = pcall(vim.fn.sign_place, note.id, M.sign_group, sign_name, bufnr, {
       lnum = display_line,
-      priority = 10,
+      priority = SIGN_PRIORITY,
     })
+    if not ok then
+      vim.notify(string.format("Failed to place sign: %s", tostring(err)), vim.log.levels.WARN)
+    end
 
     -- For range notes, display at the end of the range
     local virt_display_line = display_line
@@ -192,20 +200,31 @@ function M.update_display(bufnr, filepath, set_name)
       local range_end = math.min(note.line_range["end"], line_count)
 
       for line = range_start, range_end do
-        pcall(vim.fn.sign_place, note.id * 1000 + line, M.sign_group, sign_name, bufnr, {
+        local ok, err = pcall(vim.fn.sign_place, note.id * 1000 + line, M.sign_group, sign_name, bufnr, {
           lnum = line,
-          priority = 10,
+          priority = SIGN_PRIORITY,
         })
-        pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns_id, line - 1, 0, {
-          line_hl_group = "DiffReviewCommentLine",
-          priority = 200,
+        if not ok then
+          vim.notify(string.format("Failed to place range sign: %s", tostring(err)), vim.log.levels.WARN)
+        end
+        ok, err = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns_id, line - 1, 0, {
+          linehl = "DiffReviewCommentLine",
+          hl_mode = "combine",
+          priority = LINE_HIGHLIGHT_PRIORITY,
         })
+        if not ok then
+          vim.notify(string.format("Failed to set range extmark: %s", tostring(err)), vim.log.levels.WARN)
+        end
       end
     else
-      pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns_id, display_line - 1, 0, {
-        line_hl_group = "DiffReviewCommentLine",
+      local ok, err = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns_id, display_line - 1, 0, {
+        linehl = "DiffReviewCommentLine",
+        hl_mode = "combine",
         priority = 200,
       })
+      if not ok then
+        vim.notify(string.format("Failed to set line extmark: %s", tostring(err)), vim.log.levels.WARN)
+      end
     end
 
     ::continue::
@@ -224,11 +243,14 @@ function M.update_display(bufnr, filepath, set_name)
       end
     end
 
-    pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns_id, line - 1, 0, {
+    local ok, err = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.ns_id, line - 1, 0, {
       virt_lines = virt_lines,
       virt_lines_above = false,
-      priority = 100,
+      priority = VIRT_TEXT_PRIORITY,
     })
+    if not ok then
+      vim.notify(string.format("Failed to set virtual text: %s", tostring(err)), vim.log.levels.WARN)
+    end
   end
 end
 

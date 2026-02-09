@@ -122,7 +122,7 @@ describe("note_export", function()
       -- Should have markdown structure
       assert.is_not_nil(content:find("## Notes", 1, true))
       assert.is_not_nil(content:find("**Line 10:**", 1, true))
-      assert.is_not_nil(content:find("💬 Comment", 1, true))
+      assert.is_not_nil(content:find("> Comment", 1, true))
     end)
 
     it("should handle range notes with context", function()

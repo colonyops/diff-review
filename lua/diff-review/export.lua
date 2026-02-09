@@ -3,6 +3,7 @@ local M = {}
 
 local comments = require("diff-review.comments")
 local reviews = require("diff-review.reviews")
+local clipboard_utils = require("diff-review.clipboard_utils")
 
 -- Export mode configuration
 -- "comments": Comments with line numbers only
@@ -421,38 +422,7 @@ end
 
 -- Copy to clipboard
 function M.copy_to_clipboard(content)
-	if not content then
-		return false, "No content to copy"
-	end
-
-	-- Try different clipboard commands
-	local clip_cmd
-	if vim.fn.has("clipboard") == 1 then
-		-- Use Neovim's clipboard provider
-		vim.fn.setreg("+", content)
-		return true
-	elseif vim.fn.executable("pbcopy") == 1 then
-		-- macOS
-		clip_cmd = "pbcopy"
-	elseif vim.fn.executable("xclip") == 1 then
-		-- Linux (X11)
-		clip_cmd = "xclip -selection clipboard"
-	elseif vim.fn.executable("wl-copy") == 1 then
-		-- Linux (Wayland)
-		clip_cmd = "wl-copy"
-	else
-		return false, "No clipboard utility available"
-	end
-
-	-- Write to clipboard using external command
-	local handle = io.popen(clip_cmd, "w")
-	if not handle then
-		return false, "Failed to open clipboard command"
-	end
-	handle:write(content)
-	handle:close()
-
-	return true
+	return clipboard_utils.copy_to_clipboard(content)
 end
 
 return M
