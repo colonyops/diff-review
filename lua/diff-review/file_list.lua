@@ -108,48 +108,25 @@ local function get_stats_header_lines()
     review_type = string.format("%s..%s", review.base, review.head)
   end
 
-  -- Build stats line using format template
-  local format_str = opts.ui.stats_header.format
-  local stats_line = format_str
-    :gsub("{modified}", tostring(total_modified))
-    :gsub("{added}", tostring(total_added))
-    :gsub("{deleted}", tostring(total_deleted))
-    :gsub("{files}", tostring(file_count))
-    :gsub("{additions}", tostring(total_additions))
-    :gsub("{deletions}", tostring(total_deletions))
-    :gsub("{comments}", tostring(comment_count))
+  -- Build compact single-line stats
+  local file_parts = {}
+  if total_modified > 0 then table.insert(file_parts, string.format("%dM", total_modified)) end
+  if total_added > 0 then table.insert(file_parts, string.format("%dA", total_added)) end
+  if total_deleted > 0 then table.insert(file_parts, string.format("%dD", total_deleted)) end
+  local file_str = table.concat(file_parts, " ")
+
+  local stats_line = string.format("  %s | Files: %s | Lines: +%d -%d | Comments: %d",
+    review_type, file_str, total_additions, total_deletions, comment_count)
 
   return {
-    string.format("  Review: %s", review_type),
-    string.format("  Files: %d | Lines: +%d -%d | Comments: %d",
-      file_count, total_additions, total_deletions, comment_count),
-    string.format("  %s", stats_line),
+    stats_line,
     opts.ui.stats_header.separator,
   }
 end
 
 local function get_header_lines()
-  local opts = config.get()
-  local lines = {}
-
-  -- Add stats header if enabled
   local stats_lines = get_stats_header_lines()
-  for _, line in ipairs(stats_lines) do
-    table.insert(lines, line)
-  end
-
-  -- Add keymaps header
-  table.insert(lines, string.format(
-    "  Keys: %s add, %s edit, %s delete, %s list, %s all",
-    opts.keymaps.add_comment,
-    opts.keymaps.edit_comment,
-    opts.keymaps.delete_comment,
-    opts.keymaps.list_comments,
-    opts.keymaps.view_all_comments
-  ))
-  table.insert(lines, "")
-
-  return lines
+  return stats_lines
 end
 
 local function apply_stats_header_highlights(highlights, lines)

@@ -49,7 +49,6 @@ M.defaults = {
     show_icons = true,     -- Show file type icons
     show_stats_header = true,  -- Show statistics header at top of file list
     stats_header = {
-      format = "M:{modified} A:{added} D:{deleted}",  -- Format string for stats
       separator = " | ",   -- Separator between stats and file list
     },
     comment_window = {
