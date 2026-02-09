@@ -56,6 +56,9 @@ end
 -- Set up buffer-local keymaps
 local function setup_buffer_keymaps(bufnr)
   local opts = config.get()
+  if not opts or not opts.keymaps then
+    return -- Config not initialized, skip keymap setup
+  end
   local keymaps = opts.keymaps
 
   -- Add comment

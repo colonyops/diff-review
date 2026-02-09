@@ -6,6 +6,10 @@ describe("note_export", function()
   local test_set = "test-export-" .. os.time()
 
   before_each(function()
+    -- Initialize config for tests that enter note mode
+    local config = require("diff-review.config")
+    config.setup({})
+
     notes.clear()
     if note_mode.get_state().is_active then
       note_mode.exit()
