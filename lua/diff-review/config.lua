@@ -46,6 +46,20 @@ M.defaults = {
   ui = {
     border = "rounded",    -- Border style: "none", "single", "double", "rounded"
     show_icons = true,     -- Show file type icons
+    status = {
+      symbols = {
+        modified = "M",
+        added = "A",
+        deleted = "D",
+        renamed = "R",
+      },
+      highlights = {
+        modified = "DiffChange",
+        added = "DiffAdd",
+        deleted = "DiffDelete",
+        renamed = "DiffReviewRenamed",
+      },
+    },
     comment_line_bg = nil, -- Override comment line background (e.g., "#2f3b45")
     comment_line_hl = nil, -- Link comment line highlight to another group
     colors = {

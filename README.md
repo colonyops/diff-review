@@ -166,6 +166,20 @@ require('diff-review').setup({
   ui = {
     border = "rounded", -- "none" | "single" | "double" | "rounded"
     show_icons = true,
+    status = {
+      symbols = {
+        modified = "M",
+        added = "A",
+        deleted = "D",
+        renamed = "R",
+      },
+      highlights = {
+        modified = "DiffChange",
+        added = "DiffAdd",
+        deleted = "DiffDelete",
+        renamed = "DiffReviewRenamed",
+      },
+    },
     comment_line_bg = nil, -- Override comment line background (e.g., "#2f3b45")
     comment_line_hl = nil, -- Link comment line highlight to another group
     colors = {
@@ -188,6 +202,58 @@ require('diff-review').setup({
   -- Persistence options
   persistence = {
     auto_save = true, -- Auto-save comments after each change
+  },
+})
+```
+
+### Customizing Status Symbols
+
+The file list displays the status of each file (Modified, Added, Deleted, Renamed) using single-letter indicators. You can customize both the symbols and their colors:
+
+**With brackets:**
+```lua
+require('diff-review').setup({
+  ui = {
+    status = {
+      symbols = {
+        modified = "[M]",
+        added = "[A]",
+        deleted = "[D]",
+        renamed = "[R]",
+      },
+    },
+  },
+})
+```
+
+**Longer text:**
+```lua
+require('diff-review').setup({
+  ui = {
+    status = {
+      symbols = {
+        modified = "MOD",
+        added = "NEW",
+        deleted = "DEL",
+        renamed = "REN",
+      },
+    },
+  },
+})
+```
+
+**Custom colors:**
+```lua
+require('diff-review').setup({
+  ui = {
+    status = {
+      highlights = {
+        modified = "WarningMsg",
+        added = "String",
+        deleted = "ErrorMsg",
+        renamed = "Function",
+      },
+    },
   },
 })
 ```

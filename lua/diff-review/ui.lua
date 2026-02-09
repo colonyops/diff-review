@@ -75,6 +75,9 @@ function M.init()
   set_comment_line_highlight()
   vim.api.nvim_set_hl(0, "DiffReviewCommentGutter", { link = "DiagnosticSignInfo" })
   vim.api.nvim_set_hl(0, "DiffReviewCommentRangeGutter", { link = "DiagnosticSignHint" })
+
+  -- Define renamed file highlight (cyan-ish)
+  vim.api.nvim_set_hl(0, "DiffReviewRenamed", { link = "Function" })
 end
 
 -- Clear all comment UI for a buffer
