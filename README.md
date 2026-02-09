@@ -485,6 +485,12 @@ Switch to a different note set:
 :DiffReviewNoteSwitch refactoring
 ```
 
+Copy notes to clipboard (markdown format):
+```vim
+:DiffReviewNoteCopy         " Copy notes with line numbers
+:DiffReviewNoteCopy full    " Copy notes with code context
+```
+
 ### Usage
 
 1. **Enter note mode** with `:DiffReviewNoteEnter [set_name]`
@@ -545,6 +551,45 @@ require('diff-review').setup({
 " Add notes about how things work
 " View all notes: <leader>v
 ```
+
+### Exporting Notes
+
+Copy all notes to clipboard in markdown format:
+
+**Notes only (with line numbers):**
+```vim
+:DiffReviewNoteCopy
+```
+
+Output format:
+```markdown
+## Notes
+
+**Note Set:** security-audit
+**Date:** 2024-01-15 10:30
+
+---
+
+### src/auth.lua
+
+- Line 45: Potential SQL injection vulnerability
+- Lines 60-65: Missing input validation
+
+### src/user.lua
+
+- Line 23: TODO: Add rate limiting
+
+---
+
+**Total:** 3 notes across 2 files
+```
+
+**Full export (with code context):**
+```vim
+:DiffReviewNoteCopy full
+```
+
+Includes 2 lines of code context before/after each note with syntax highlighting.
 
 ### Coexistence with Diff Review
 
