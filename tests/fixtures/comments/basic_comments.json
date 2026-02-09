@@ -1,0 +1,23 @@
+[
+  {
+    "id": "comment-1",
+    "file": "src/example.lua",
+    "line": 5,
+    "text": "This looks good!",
+    "timestamp": 1234567890
+  },
+  {
+    "id": "comment-2",
+    "file": "src/example.lua",
+    "line": 10,
+    "text": "Consider adding error handling",
+    "timestamp": 1234567900
+  },
+  {
+    "id": "comment-3",
+    "file": "src/another.lua",
+    "line": 15,
+    "text": "Need to refactor this",
+    "timestamp": 1234567910
+  }
+]

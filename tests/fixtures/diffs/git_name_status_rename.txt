@@ -1,0 +1,2 @@
+R100	src/old_name.lua	src/new_name.lua
+M	src/example.lua

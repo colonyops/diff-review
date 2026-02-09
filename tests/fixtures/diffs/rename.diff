@@ -1,0 +1,14 @@
+diff --git a/src/old_name.lua b/src/new_name.lua
+similarity index 85%
+rename from src/old_name.lua
+rename to src/new_name.lua
+index 1234567..abcdefg 100644
+--- a/src/old_name.lua
++++ b/src/new_name.lua
+@@ -1,5 +1,6 @@
+ local M = {}
+
+ function M.process()
++  -- Added comment
+   return "result"
+ end

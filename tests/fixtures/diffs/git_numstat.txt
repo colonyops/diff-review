@@ -1,0 +1,4 @@
+5	3	src/example.lua
+10	0	src/new_file.lua
+0	8	src/old_file.lua
+-	-	assets/icon.png

@@ -1,0 +1,17 @@
+diff --git a/src/example.lua b/src/example.lua
+index 1234567..abcdefg 100644
+--- a/src/example.lua
++++ b/src/example.lua
+@@ -1,8 +1,10 @@
+ local M = {}
+
+ function M.hello()
+-  print("Hello")
++  print("Hello, World!")
++  return true
+ end
+
+ function M.goodbye()
+   print("Goodbye")
++  return false
+ end

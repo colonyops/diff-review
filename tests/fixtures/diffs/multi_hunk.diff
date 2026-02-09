@@ -1,0 +1,22 @@
+diff --git a/src/multi.lua b/src/multi.lua
+index 1234567..abcdefg 100644
+--- a/src/multi.lua
++++ b/src/multi.lua
+@@ -5,7 +5,8 @@ function M.first()
+   local x = 1
+   local y = 2
+-  return x + y
++  local z = 3
++  return x + y + z
+ end
+
+ function M.second()
+@@ -20,7 +21,7 @@ function M.third()
+   for i = 1, 10 do
+     print(i)
+   end
+-  return "done"
++  return "complete"
+ end
+
+ function M.fourth()

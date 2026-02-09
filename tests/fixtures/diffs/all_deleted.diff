@@ -1,0 +1,14 @@
+diff --git a/src/old_file.lua b/src/old_file.lua
+deleted file mode 100644
+index 1234567..0000000
+--- a/src/old_file.lua
++++ /dev/null
+@@ -1,10 +0,0 @@
+-local M = {}
+-
+-function M.old_function()
+-  print("This is old")
+-  return false
+-end
+-
+-return M
