@@ -12,26 +12,69 @@ M.sign_group = "diff_review_comments"
 local function define_signs()
   vim.fn.sign_define("DiffReviewComment", {
     text = "▸",
-    texthl = "DiagnosticSignInfo",
+    texthl = "DiffReviewCommentGutter",
     linehl = "",
-    numhl = "",
+    numhl = "DiffReviewCommentGutter",
   })
 
   vim.fn.sign_define("DiffReviewCommentRange", {
     text = "▸",
-    texthl = "DiagnosticSignHint",
+    texthl = "DiffReviewCommentRangeGutter",
     linehl = "",
-    numhl = "",
+    numhl = "DiffReviewCommentRangeGutter",
   })
+end
+
+local function get_comment_fg()
+  -- Get warning foreground color from the theme
+  local ok_warn, warn = pcall(vim.api.nvim_get_hl, 0, { name = "DiagnosticWarn", link = false })
+  local fg = ok_warn and warn and warn.fg or nil
+  if not fg then
+    local ok_warn_sign, warn_sign = pcall(vim.api.nvim_get_hl, 0, { name = "DiagnosticSignWarn", link = false })
+    fg = ok_warn_sign and warn_sign and warn_sign.fg or nil
+  end
+  if not fg then
+    local ok_warn_hl, warn_hl = pcall(vim.api.nvim_get_hl, 0, { name = "WarningMsg", link = false })
+    fg = ok_warn_hl and warn_hl and warn_hl.fg or nil
+  end
+
+  return fg
+end
+
+local function get_comment_bg()
+  local opts = config.get()
+  if opts.ui.comment_line_bg then
+    return opts.ui.comment_line_bg
+  end
+  return nil
+end
+
+local function set_comment_line_highlight()
+  local opts = config.get()
+  if opts.ui.comment_line_hl then
+    vim.api.nvim_set_hl(0, "DiffReviewCommentLine", { link = opts.ui.comment_line_hl })
+  else
+    -- No background for comment lines
+    vim.api.nvim_set_hl(0, "DiffReviewCommentLine", {})
+  end
 end
 
 -- Initialize UI
 function M.init()
   define_signs()
 
-  -- Define highlight groups
-  vim.api.nvim_set_hl(0, "DiffReviewComment", { link = "Comment" })
-  vim.api.nvim_set_hl(0, "DiffReviewCommentRange", { link = "Comment" })
+  -- Define highlight groups with warning color
+  local fg = get_comment_fg()
+  if fg then
+    vim.api.nvim_set_hl(0, "DiffReviewComment", { fg = fg })
+    vim.api.nvim_set_hl(0, "DiffReviewCommentRange", { fg = fg })
+  else
+    vim.api.nvim_set_hl(0, "DiffReviewComment", { link = "WarningMsg" })
+    vim.api.nvim_set_hl(0, "DiffReviewCommentRange", { link = "WarningMsg" })
+  end
+  set_comment_line_highlight()
+  vim.api.nvim_set_hl(0, "DiffReviewCommentGutter", { link = "DiagnosticSignInfo" })
+  vim.api.nvim_set_hl(0, "DiffReviewCommentRangeGutter", { link = "DiagnosticSignHint" })
 end
 
 -- Clear all comment UI for a buffer
@@ -53,13 +96,18 @@ local function format_comment_text(comment)
   local lines = vim.split(comment.text, "\n")
   local formatted = {}
 
-  -- Add prefix to each line
-  for i, line in ipairs(lines) do
-    if i == 1 then
-      table.insert(formatted, "💬 " .. line)
-    else
-      table.insert(formatted, "   " .. line)
-    end
+  -- Add line range header
+  local line_info
+  if comment.type == "range" and comment.line_range then
+    line_info = string.format("  L%d-L%d", comment.line_range.start, comment.line_range["end"])
+  else
+    line_info = string.format("  L%d", comment.line)
+  end
+  table.insert(formatted, line_info)
+
+  -- Add comment text lines with indentation
+  for _, line in ipairs(lines) do
+    table.insert(formatted, "   " .. line)
   end
 
   return formatted
@@ -94,20 +142,6 @@ function M.update_comment_display()
   local current_file = files[current_index].path
   local file_comments = comments.get_for_file(current_file)
 
-  -- Debug: check if comments exist but aren't matching
-  local all_comments = comments.get_all()
-  if #all_comments > 0 and #file_comments == 0 then
-    local comment_files = {}
-    for _, c in ipairs(all_comments) do
-      comment_files[c.file] = (comment_files[c.file] or 0) + 1
-    end
-    local msg = string.format("No comments match current file '%s'. Comments exist for:", current_file)
-    for file, count in pairs(comment_files) do
-      msg = msg .. string.format("\n  '%s' (%d)", file, count)
-    end
-    vim.notify(msg, vim.log.levels.WARN)
-  end
-
   if #file_comments == 0 then
     return
   end
@@ -119,7 +153,10 @@ function M.update_comment_display()
   local placed_count = 0
   local failed_comments = {}
 
-  -- Place signs and virtual text for each comment
+  -- Collect virtual text by display line to avoid overwriting on overlaps
+  local virtual_by_line = {}
+
+  -- Place signs and line highlights for each comment
   for _, comment in ipairs(file_comments) do
     -- Validate line number
     if not comment.line or comment.line < 1 then
@@ -156,37 +193,20 @@ function M.update_comment_display()
       goto continue
     end
 
-    -- Add virtual text below the line (or end of range for range comments)
-    local formatted_text = format_comment_text(comment)
-    local virt_lines = {}
-    for _, line in ipairs(formatted_text) do
-      table.insert(virt_lines, { { line, "DiffReviewComment" } })
-    end
-
     -- For range comments, display at the end of the range
     local virt_display_line = display_line
     if comment.type == "range" and comment.line_range then
       virt_display_line = math.min(comment.line_range["end"], line_count)
     end
 
-    -- Virtual text uses 0-indexed line numbers
-    ok, err = pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, virt_display_line - 1, 0, {
-      virt_lines = virt_lines,
-      virt_lines_above = false,
-      hl_mode = "combine",
-    })
-
-    if not ok then
-      table.insert(failed_comments, {
-        id = comment.id,
-        reason = string.format("Virtual text failed: %s", tostring(err))
-      })
-      goto continue
+    if virt_display_line >= 1 and virt_display_line <= line_count then
+      virtual_by_line[virt_display_line] = virtual_by_line[virt_display_line] or {}
+      table.insert(virtual_by_line[virt_display_line], comment)
     end
 
     -- If it's a range comment, place signs on all lines in range
     if comment.type == "range" and comment.line_range then
-      local range_start = math.max(comment.line_range.start + 1, 1)
+      local range_start = math.max(comment.line_range.start, 1)
       local range_end = math.min(comment.line_range["end"], line_count)
 
       for line = range_start, range_end do
@@ -194,12 +214,50 @@ function M.update_comment_display()
           lnum = line,
           priority = 10,
         })
+        pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, line - 1, 0, {
+          linehl = "DiffReviewCommentLine",
+          hl_mode = "combine",
+          priority = 200,
+        })
       end
+    else
+      pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, display_line - 1, 0, {
+        linehl = "DiffReviewCommentLine",
+        hl_mode = "combine",
+        priority = 200,
+      })
     end
 
     placed_count = placed_count + 1
 
     ::continue::
+  end
+
+  -- Render virtual text once per line to avoid overlap replacement
+  for line, line_comments in pairs(virtual_by_line) do
+    local virt_lines = {}
+    for idx, comment in ipairs(line_comments) do
+      if idx > 1 then
+        table.insert(virt_lines, { { "", "DiffReviewComment" } })
+      end
+      local formatted_text = format_comment_text(comment)
+      for _, text in ipairs(formatted_text) do
+        table.insert(virt_lines, { { text, "DiffReviewComment" } })
+      end
+    end
+
+    local ok, err = pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, line - 1, 0, {
+      virt_lines = virt_lines,
+      virt_lines_above = false,
+      hl_mode = "combine",
+    })
+
+    if not ok then
+      table.insert(failed_comments, {
+        id = 0,
+        reason = string.format("Virtual text failed: %s", tostring(err))
+      })
+    end
   end
 
   -- Report any failures
@@ -210,8 +268,6 @@ function M.update_comment_display()
     end
     vim.notify(msg, vim.log.levels.WARN)
   end
-
-  M.update_cursor_comment()
 end
 
 -- Show comment text at cursor line for visibility

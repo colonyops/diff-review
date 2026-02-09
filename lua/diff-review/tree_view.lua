@@ -11,9 +11,9 @@ local M = {}
 -- }
 
 -- Build a tree structure from a flat list of files
-function M.build_tree(files)
+function M.build_tree(files, root_name)
   local root = {
-    name = "",
+    name = root_name or "",
     path = "",
     type = "directory",
     children = {},
@@ -57,9 +57,14 @@ end
 
 -- Flatten tree into a renderable list with metadata
 -- Returns: { { node, depth, index } }
-function M.flatten_tree(root, current_index)
+function M.flatten_tree(root, files)
   local result = {}
-  local file_index = 1
+
+  -- Build a map from file path to index in files array
+  local path_to_index = {}
+  for i, file in ipairs(files) do
+    path_to_index[file.path] = i
+  end
 
   local function traverse(node, depth)
     if node.type == "directory" and node.name ~= "" then
@@ -93,12 +98,13 @@ function M.flatten_tree(root, current_index)
       local child = node.children[name]
 
       if child.type == "file" then
+        -- Look up the actual index from the files array
+        local file_index = path_to_index[child.path]
         table.insert(result, {
           node = child,
           depth = depth,
           index = file_index,
         })
-        file_index = file_index + 1
       else
         traverse(child, depth + 1)
       end
@@ -112,6 +118,14 @@ end
 
 -- Toggle directory expansion
 function M.toggle_directory(tree, path)
+  if not path or path == "" then
+    if tree.type == "directory" then
+      tree.expanded = not tree.expanded
+      return true
+    end
+    return false
+  end
+
   local parts = vim.split(path, "/", { plain = true })
   local current = tree
 
@@ -133,6 +147,17 @@ end
 
 -- Set directory expansion state
 function M.set_directory_expanded(tree, path, expanded)
+  if not path or path == "" then
+    if tree.type == "directory" then
+      if tree.expanded == expanded then
+        return false
+      end
+      tree.expanded = expanded
+      return true
+    end
+    return false
+  end
+
   local parts = vim.split(path, "/", { plain = true })
   local current = tree
 

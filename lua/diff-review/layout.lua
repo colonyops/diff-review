@@ -14,6 +14,13 @@ M.state = {
 
 -- Create a new scratch buffer
 local function create_scratch_buffer(name)
+  -- Check if buffer with this name already exists
+  local existing_buf = vim.fn.bufnr(name)
+  if existing_buf ~= -1 and vim.api.nvim_buf_is_valid(existing_buf) then
+    -- Delete the existing buffer
+    vim.api.nvim_buf_delete(existing_buf, { force = true })
+  end
+
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_name(buf, name)
   vim.api.nvim_buf_set_option(buf, "bufhidden", "wipe")
@@ -128,15 +135,7 @@ function M.open(review_type, base, head, pr_number)
   -- Setup keymaps
   M.setup_keymaps()
 
-  -- Cursor comment visibility
-  local ui = require("diff-review.ui")
-  ui.update_cursor_comment()
-  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
-    buffer = M.state.diff_buf,
-    callback = function()
-      ui.update_cursor_comment()
-    end,
-  })
+  -- Cursor comment visibility removed to avoid duplicate rendering.
 
   -- Focus file list
   vim.api.nvim_set_current_win(M.state.file_list_win)
@@ -153,8 +152,35 @@ function M.close()
     return
   end
 
-  -- Close the tab
-  vim.cmd("tabclose")
+  local file_list_buf = M.state.file_list_buf
+  local diff_buf = M.state.diff_buf
+  local file_list_win = M.state.file_list_win
+  local diff_win = M.state.diff_win
+  local original_win = M.state.original_win
+
+  -- Switch to original window first so we're outside the tab
+  if original_win and vim.api.nvim_win_is_valid(original_win) then
+    vim.api.nvim_set_current_win(original_win)
+  end
+
+  -- Close windows explicitly
+  if file_list_win and vim.api.nvim_win_is_valid(file_list_win) then
+    vim.api.nvim_win_close(file_list_win, true)
+  end
+  if diff_win and vim.api.nvim_win_is_valid(diff_win) then
+    vim.api.nvim_win_close(diff_win, true)
+  end
+
+  -- Now delete the buffers
+  if file_list_buf and vim.api.nvim_buf_is_valid(file_list_buf) then
+    vim.api.nvim_buf_delete(file_list_buf, { force = true })
+  end
+  if diff_buf and vim.api.nvim_buf_is_valid(diff_buf) then
+    vim.api.nvim_buf_delete(diff_buf, { force = true })
+  end
+
+  -- Close any remaining empty tab
+  vim.cmd("silent! tabclose")
 
   -- Clean up state
   M.state.is_open = false
@@ -162,11 +188,6 @@ function M.close()
   M.state.file_list_buf = nil
   M.state.diff_win = nil
   M.state.diff_buf = nil
-
-  -- Return to original window if it still exists
-  if M.state.original_win and vim.api.nvim_win_is_valid(M.state.original_win) then
-    vim.api.nvim_set_current_win(M.state.original_win)
-  end
   M.state.original_win = nil
 end
 
@@ -194,6 +215,14 @@ function M.setup_keymaps()
   vim.keymap.set("n", opts.keymaps.open_directory, require("diff-review.file_list").open_fold, keymap_opts)
   vim.keymap.set("n", opts.keymaps.close_directory, require("diff-review.file_list").close_fold, keymap_opts)
   vim.keymap.set("n", "<leader>t", require("diff-review.file_list").toggle_view_mode, keymap_opts)
+
+  -- Track cursor movement to sync selection
+  vim.api.nvim_create_autocmd("CursorMoved", {
+    buffer = M.state.file_list_buf,
+    callback = function()
+      require("diff-review.file_list").sync_selection_to_cursor()
+    end,
+  })
 
   -- Diff window keymaps
   keymap_opts.buffer = M.state.diff_buf

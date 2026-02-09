@@ -54,16 +54,42 @@ function M.add_comment_for_range()
     return
   end
 
-  -- Get visual selection range
-  local start_line = vim.fn.line("'<")
-  local end_line = vim.fn.line("'>")
+  -- Capture the visual selection immediately before exiting visual mode
+  -- Use vim.fn.getpos to get the actual current visual selection
+  local start_pos = vim.fn.getpos("v")
+  local end_pos = vim.fn.getpos(".")
+
+  local start_line = start_pos[2]
+  local end_line = end_pos[2]
+
+  -- Validate selection
+  if start_line == 0 or end_line == 0 then
+    vim.notify("Invalid selection", vim.log.levels.WARN)
+    return
+  end
 
   -- Ensure proper order
   if start_line > end_line then
     start_line, end_line = end_line, start_line
   end
 
-  -- Open popup for comment input
+  -- Exit visual mode
+  vim.cmd('normal! \\<Esc>')
+
+  -- For single line, use single comment instead of range
+  if start_line == end_line then
+    popup.open(nil, function(text)
+      comments.add(file, start_line, text, nil)
+      vim.notify(
+        string.format("Comment added at line %d", start_line),
+        vim.log.levels.INFO
+      )
+      M.refresh_comments()
+    end)
+    return
+  end
+
+  -- Open popup for range comment input
   popup.open(nil, function(text)
     local line_range = { start = start_line, ["end"] = end_line }
     local comment = comments.add(file, start_line, text, line_range)

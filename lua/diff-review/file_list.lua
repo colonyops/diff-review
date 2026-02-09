@@ -16,6 +16,7 @@ M.state = {
   view_mode = (config.get().file_list and config.get().file_list.view_mode) or "tree",  -- "flat" or "tree"
   tree = nil,  -- Tree structure for tree view
   flat_tree = nil,  -- Flattened tree for rendering
+  initial_load = true,  -- Flag for initial load to select first visual file
 }
 
 -- Status icons and colors
@@ -25,6 +26,29 @@ local status_icons = {
   D = { icon = "-", hl = "DiffDelete" },  -- Deleted
   R = { icon = "→", hl = "DiffChange" },  -- Renamed
 }
+
+local function get_repo_root_name()
+  local root = vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"):gsub("\n", "")
+  if vim.v.shell_error ~= 0 or root == "" then
+    root = vim.fn.getcwd()
+  end
+  return vim.fn.fnamemodify(root, ":t")
+end
+
+local function get_header_lines()
+  local opts = config.get()
+  return {
+    string.format(
+      "  Keys: %s add, %s edit, %s delete, %s list, %s all",
+      opts.keymaps.add_comment,
+      opts.keymaps.edit_comment,
+      opts.keymaps.delete_comment,
+      opts.keymaps.list_comments,
+      opts.keymaps.view_all_comments
+    ),
+    "",
+  }
+end
 
 -- Get file icon and color from devicons
 local function get_file_icon(filepath)
@@ -43,39 +67,34 @@ end
 local function build_tree_connectors(flat_tree, current_idx)
   local connectors = {}
 
-  -- Track which depths have more siblings below
-  local has_more_at_depth = {}
-
-  -- Scan from bottom to top to determine tree structure
-  for i = #flat_tree, 1, -1 do
+  for i = 1, #flat_tree do
     local entry = flat_tree[i]
     local depth = entry.depth
-
-    -- Clear deeper levels when we go back up
-    for d = depth + 1, 10 do
-      has_more_at_depth[d] = false
-    end
-
-    -- Mark that this depth has content
-    has_more_at_depth[depth] = true
-
-    -- Build connector string for this entry
     local connector = ""
-    for d = 1, depth - 1 do
-      if has_more_at_depth[d + 1] then
-        connector = connector .. "│  "
-      else
-        connector = connector .. "   "
-      end
-    end
 
-    -- Add branch character for the current depth
-    if depth > 0 then
-      -- Check if there are more entries at same or deeper depth after this one
+    if depth == 0 then
+      connectors[i] = ""
+    else
+      -- Build vertical lines for parent levels
+      for d = 1, depth - 1 do
+        -- Check if there are more siblings at depth d after the current position
+        local has_more = false
+        for j = i + 1, #flat_tree do
+          if flat_tree[j].depth < d then
+            break
+          end
+          if flat_tree[j].depth == d then
+            has_more = true
+            break
+          end
+        end
+        connector = connector .. (has_more and "│  " or "   ")
+      end
+
+      -- Check if this is the last sibling at current depth
       local is_last = true
-      local parent_depth = depth - 1
       for j = i + 1, #flat_tree do
-        if flat_tree[j].depth <= parent_depth then
+        if flat_tree[j].depth < depth then
           break
         end
         if flat_tree[j].depth == depth then
@@ -85,9 +104,8 @@ local function build_tree_connectors(flat_tree, current_idx)
       end
 
       connector = connector .. (is_last and "└─ " or "├─ ")
+      connectors[i] = connector
     end
-
-    connectors[i] = connector
   end
 
   return connectors
@@ -101,11 +119,11 @@ local function render_tree_view(state, lines, highlights)
 
   -- Build tree if not cached or files changed
   if not M.state.tree then
-    M.state.tree = tree_view.build_tree(M.state.files)
+    M.state.tree = tree_view.build_tree(M.state.files, M.state.tree_root_name)
   end
 
   -- Flatten tree for rendering
-  M.state.flat_tree = tree_view.flatten_tree(M.state.tree, M.state.current_index)
+  M.state.flat_tree = tree_view.flatten_tree(M.state.tree, M.state.files)
 
   -- Get stats once
   local comment_stats = comments.stats()
@@ -283,12 +301,28 @@ function M.render()
   local lines = {}
   local highlights = {}
 
-  table.insert(lines, "")
+  local header_lines = get_header_lines()
+  for _, line in ipairs(header_lines) do
+    table.insert(lines, line)
+  end
+
+  M.state.tree_root_name = get_repo_root_name()
 
   if #M.state.files == 0 then
     table.insert(lines, "  No changes found")
   elseif M.state.view_mode == "tree" then
     render_tree_view(state, lines, highlights)
+
+    -- On initial load, always select first file in visual tree order
+    if M.state.initial_load and M.state.flat_tree and #M.state.flat_tree > 0 then
+      for _, entry in ipairs(M.state.flat_tree) do
+        if entry.index then
+          M.state.current_index = entry.index
+          M.state.initial_load = false
+          break
+        end
+      end
+    end
   else
     -- Get comment counts for all files
     local comments = require("diff-review.comments")
@@ -443,7 +477,7 @@ function M.render()
       -- Find the line in flat_tree that matches current_index
       for i, entry in ipairs(M.state.flat_tree) do
         if entry.index == M.state.current_index then
-          local cursor_line = i + 1  -- +1 for header
+          local cursor_line = i + #header_lines  -- +header for hint + spacer
           if cursor_line <= #lines then
             vim.api.nvim_win_set_cursor(state.file_list_win, { cursor_line, 0 })
           end
@@ -452,7 +486,7 @@ function M.render()
       end
     else
       -- Flat view: Header takes 2 lines
-      local cursor_line = M.state.current_index + 2
+      local cursor_line = M.state.current_index + #header_lines
       if cursor_line <= #lines then
         vim.api.nvim_win_set_cursor(state.file_list_win, { cursor_line, 0 })
       end
@@ -466,9 +500,42 @@ function M.next_file()
     return
   end
 
-  M.state.current_index = M.state.current_index + 1
-  if M.state.current_index > #M.state.files then
-    M.state.current_index = 1
+  if M.state.view_mode == "tree" and M.state.flat_tree then
+    -- Navigate through flat tree in visual order
+    local current_pos = nil
+    for i, entry in ipairs(M.state.flat_tree) do
+      if entry.index == M.state.current_index then
+        current_pos = i
+        break
+      end
+    end
+
+    if current_pos then
+      -- Find next file entry (skip directories)
+      for i = current_pos + 1, #M.state.flat_tree do
+        if M.state.flat_tree[i].index then
+          M.state.current_index = M.state.flat_tree[i].index
+          M.render()
+          M.update_diff()
+          return
+        end
+      end
+      -- Wrap to first file
+      for i = 1, current_pos do
+        if M.state.flat_tree[i].index then
+          M.state.current_index = M.state.flat_tree[i].index
+          M.render()
+          M.update_diff()
+          return
+        end
+      end
+    end
+  else
+    -- Flat view: simple sequential navigation
+    M.state.current_index = M.state.current_index + 1
+    if M.state.current_index > #M.state.files then
+      M.state.current_index = 1
+    end
   end
 
   M.render()
@@ -481,13 +548,82 @@ function M.prev_file()
     return
   end
 
-  M.state.current_index = M.state.current_index - 1
-  if M.state.current_index < 1 then
-    M.state.current_index = #M.state.files
+  if M.state.view_mode == "tree" and M.state.flat_tree then
+    -- Navigate through flat tree in visual order
+    local current_pos = nil
+    for i, entry in ipairs(M.state.flat_tree) do
+      if entry.index == M.state.current_index then
+        current_pos = i
+        break
+      end
+    end
+
+    if current_pos then
+      -- Find previous file entry (skip directories)
+      for i = current_pos - 1, 1, -1 do
+        if M.state.flat_tree[i].index then
+          M.state.current_index = M.state.flat_tree[i].index
+          M.render()
+          M.update_diff()
+          return
+        end
+      end
+      -- Wrap to last file
+      for i = #M.state.flat_tree, current_pos, -1 do
+        if M.state.flat_tree[i].index then
+          M.state.current_index = M.state.flat_tree[i].index
+          M.render()
+          M.update_diff()
+          return
+        end
+      end
+    end
+  else
+    -- Flat view: simple sequential navigation
+    M.state.current_index = M.state.current_index - 1
+    if M.state.current_index < 1 then
+      M.state.current_index = #M.state.files
+    end
   end
 
   M.render()
   M.update_diff()
+end
+
+-- Sync selection to cursor position (for manual cursor movement)
+function M.sync_selection_to_cursor()
+  local layout = require("diff-review.layout")
+  local state = layout.get_state()
+
+  if not state.file_list_win or not vim.api.nvim_win_is_valid(state.file_list_win) then
+    return
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(state.file_list_win)
+  local line_num = cursor[1] - #get_header_lines()
+
+  if M.state.view_mode == "tree" and M.state.flat_tree then
+    if line_num >= 1 and line_num <= #M.state.flat_tree then
+      local entry = M.state.flat_tree[line_num]
+      if entry.index then
+        -- Only update if it's a different file
+        if M.state.current_index ~= entry.index then
+          M.state.current_index = entry.index
+          M.update_diff()
+          M.render()
+        end
+      end
+    end
+  else
+    -- Flat view
+    if line_num >= 1 and line_num <= #M.state.files then
+      if M.state.current_index ~= line_num then
+        M.state.current_index = line_num
+        M.update_diff()
+        M.render()
+      end
+    end
+  end
 end
 
 -- Select current file and show diff
@@ -549,7 +685,7 @@ function M.toggle_fold()
 
   -- Get current cursor line
   local cursor = vim.api.nvim_win_get_cursor(state.file_list_win)
-  local line_num = cursor[1] - 1  -- Convert to 0-indexed, accounting for header
+  local line_num = cursor[1] - #get_header_lines()  -- Convert to 0-indexed, accounting for header
 
   if line_num < 1 or line_num > #M.state.flat_tree then
     return
@@ -577,7 +713,7 @@ local function set_fold_state(expanded)
   end
 
   local cursor = vim.api.nvim_win_get_cursor(state.file_list_win)
-  local line_num = cursor[1] - 1
+  local line_num = cursor[1] - #get_header_lines()
 
   if line_num < 1 or line_num > #M.state.flat_tree then
     return
