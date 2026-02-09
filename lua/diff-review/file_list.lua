@@ -115,8 +115,17 @@ local function get_stats_header_lines()
   if total_added > 0 then table.insert(file_parts, string.format("%dA", total_added)) end
   local file_str = table.concat(file_parts, " ")
 
-  local stats_line = string.format("  %s | 📄 %s | +%d -%d",
-    review_type, file_str, total_additions, total_deletions)
+  -- Get file icon if available
+  local icon_str = ""
+  if opts.ui.show_icons and devicons then
+    local icon = devicons.get_icon("file", "", { default = true })
+    if icon then
+      icon_str = icon .. " "
+    end
+  end
+
+  local stats_line = string.format("  %s | %s%s | +%d -%d",
+    review_type, icon_str, file_str, total_additions, total_deletions)
 
   return {
     stats_line,
