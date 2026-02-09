@@ -99,6 +99,49 @@ Submit PR review comments (PR reviews only):
 :DiffReviewSubmit
 ```
 
+Toggle diff review window (preserves state):
+```vim
+:DiffReviewToggle
+```
+
+### Navigating to Files
+
+You can navigate directly from the diff view to the actual file in your editor:
+
+- `gf` - Open file at cursor position in current window
+- `<C-w>f` - Open file in horizontal split
+- `<C-w>gf` - Open file in vertical split
+
+Alternatively, use commands:
+```vim
+:DiffReviewOpenFile
+:DiffReviewOpenFileSplit
+:DiffReviewOpenFileVsplit
+```
+
+**Behavior:**
+- For added and context lines: Opens file at the corresponding line number
+- For deleted lines: Shows notification (cannot navigate to deleted content)
+- For hunk headers: Jumps to the start of the hunk
+- Closes the review window and returns focus to the original window
+
+### Toggle Review with State Preservation
+
+The `:DiffReviewToggle` command allows you to close and reopen the review while preserving your session state:
+
+```lua
+-- Map to a convenient key
+vim.keymap.set("n", "<leader>dr", ":DiffReviewToggle<CR>", { desc = "Toggle diff review" })
+```
+
+**Preserved state includes:**
+- Review context (PR number, branch comparison, uncommitted changes)
+- Selected file and position
+- Cursor and scroll position in diff view
+- View mode (tree or flat)
+
+State persists across Neovim restarts in `~/.local/share/nvim/diff-review/session_state.json` (respects `$XDG_DATA_HOME`).
+
 ### Keybindings (default)
 
 **File List Panel:**
@@ -114,6 +157,9 @@ Submit PR review comments (PR reviews only):
 **Diff Panel:**
 - `q` - Close window
 - Standard Neovim navigation (`j`, `k`, `gg`, `G`, etc.)
+- `gf` - Open file at cursor in current window
+- `<C-w>f` - Open file in horizontal split
+- `<C-w>gf` - Open file in vertical split
 - `<leader>c` - Add comment at cursor (normal) or for range (visual)
 - `<leader>e` - Edit comment at cursor
 - `<leader>d` - Delete comment at cursor
