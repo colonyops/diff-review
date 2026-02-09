@@ -34,6 +34,7 @@ M.defaults = {
   -- File list options
   file_list = {
     view_mode = "tree",  -- "flat" or "tree"
+    focus_diff_on_select = true,  -- Auto-focus diff window when selecting a file
   },
 
   -- Git options
@@ -46,6 +47,16 @@ M.defaults = {
   ui = {
     border = "rounded",    -- Border style: "none", "single", "double", "rounded"
     show_icons = true,     -- Show file type icons
+    show_stats_header = true,  -- Show statistics header at top of file list
+    stats_header = {
+      separator = " | ",   -- Separator between stats and file list
+    },
+    text_wrap_width = 80,  -- Maximum width for comment text before wrapping
+    comment_window = {
+      initial_height = 10,  -- Starting height of comment window
+      max_height = 30,      -- Maximum height for comment window
+      dynamic_resize = true,  -- Auto-resize based on content
+    },
     status = {
       symbols = {
         modified = "M",

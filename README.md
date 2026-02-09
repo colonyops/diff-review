@@ -12,6 +12,9 @@ A Neovim plugin for reviewing git diffs and pull requests with an intuitive spli
 - Vim-style navigation and folding controls
 - Syntax highlighting with treesitter (strips +/- and shows as line backgrounds)
 - Configurable keymaps, UI, and diff tools
+- Auto-focus diff window for seamless navigation
+- Statistics header with aggregate review metrics
+- Dynamic comment window that resizes with content
 
 ## Requirements
 
@@ -154,6 +157,7 @@ require('diff-review').setup({
   -- File list options
   file_list = {
     view_mode = "tree", -- "flat" | "tree"
+    focus_diff_on_select = true, -- Auto-focus diff window when selecting a file
   },
 
   -- Git options
@@ -166,6 +170,15 @@ require('diff-review').setup({
   ui = {
     border = "rounded", -- "none" | "single" | "double" | "rounded"
     show_icons = true,
+    show_stats_header = true, -- Show statistics header at top of file list
+    stats_header = {
+      separator = " | ", -- Separator between stats and file list
+    },
+    comment_window = {
+      initial_height = 10, -- Starting height of comment window
+      max_height = 30, -- Maximum height for comment window
+      dynamic_resize = true, -- Auto-resize based on content
+    },
     status = {
       symbols = {
         modified = "M",
@@ -202,6 +215,48 @@ require('diff-review').setup({
   -- Persistence options
   persistence = {
     auto_save = true, -- Auto-save comments after each change
+  },
+})
+```
+
+### Quality of Life Features
+
+**Auto-focus Diff Window**: When enabled, selecting a file automatically focuses the diff window for immediate viewing:
+```lua
+require('diff-review').setup({
+  file_list = {
+    focus_diff_on_select = true, -- Default: true
+  },
+})
+```
+
+**Statistics Header**: Display aggregate review statistics at the top of the file list:
+```lua
+require('diff-review').setup({
+  ui = {
+    show_stats_header = true, -- Default: true
+    stats_header = {
+      separator = " | ", -- Line separator
+    },
+  },
+})
+```
+
+The statistics header shows:
+- Review type (PR number, branch comparison, etc.)
+- File counts by status (Modified, Added, Deleted)
+- Total line additions and deletions
+- Comment count
+
+**Dynamic Comment Window**: The comment input window automatically resizes based on content:
+```lua
+require('diff-review').setup({
+  ui = {
+    comment_window = {
+      initial_height = 10, -- Starting height
+      max_height = 30, -- Maximum height
+      dynamic_resize = true, -- Default: true
+    },
   },
 })
 ```
