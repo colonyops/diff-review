@@ -5,6 +5,7 @@ local config = require("diff-review.config")
 
 -- Namespaces for highlights and signs
 M.ns_id = vim.api.nvim_create_namespace("diff_review_comments")
+M.cursor_ns_id = vim.api.nvim_create_namespace("diff_review_comment_cursor")
 M.sign_group = "diff_review_comments"
 
 -- Define sign for comments
@@ -41,6 +42,7 @@ function M.clear_comments(buf)
 
   -- Clear virtual text
   vim.api.nvim_buf_clear_namespace(buf, M.ns_id, 0, -1)
+  vim.api.nvim_buf_clear_namespace(buf, M.cursor_ns_id, 0, -1)
 
   -- Clear signs
   vim.fn.sign_unplace(M.sign_group, { buffer = buf })
@@ -208,6 +210,52 @@ function M.update_comment_display()
     end
     vim.notify(msg, vim.log.levels.WARN)
   end
+
+  M.update_cursor_comment()
+end
+
+-- Show comment text at cursor line for visibility
+function M.update_cursor_comment()
+  local layout = require("diff-review.layout")
+  local state = layout.get_state()
+
+  if not state.is_open or not state.diff_buf or not vim.api.nvim_buf_is_valid(state.diff_buf) then
+    return
+  end
+  if not state.diff_win or not vim.api.nvim_win_is_valid(state.diff_win) then
+    return
+  end
+
+  vim.api.nvim_buf_clear_namespace(state.diff_buf, M.cursor_ns_id, 0, -1)
+
+  local file_list = require("diff-review.file_list")
+  local files = file_list.state.files
+  local current_index = file_list.state.current_index
+  if #files == 0 or current_index < 1 or current_index > #files then
+    return
+  end
+
+  local current_file = files[current_index].path
+  local cursor = vim.api.nvim_win_get_cursor(state.diff_win)
+  local line = cursor[1]
+  local line_comments = comments.get_at_line(current_file, line)
+  if #line_comments == 0 then
+    return
+  end
+
+  local virt_lines = {}
+  for _, comment in ipairs(line_comments) do
+    local formatted = format_comment_text(comment)
+    for _, text in ipairs(formatted) do
+      table.insert(virt_lines, { { text, "DiffReviewComment" } })
+    end
+  end
+
+  pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.cursor_ns_id, line - 1, 0, {
+    virt_lines = virt_lines,
+    virt_lines_above = true,
+    hl_mode = "combine",
+  })
 end
 
 -- Create a bordered window

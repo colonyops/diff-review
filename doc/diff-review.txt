@@ -1,0 +1,149 @@
+*diff-review.nvim*
+
+diff-review.nvim                                     *diff-review*
+
+diff-review.nvim is a Neovim plugin for reviewing git diffs with a split
+file list and diff view, plus inline comments.
+
+==============================================================================
+SETUP                                                     *diff-review-setup*
+
+Install with your plugin manager and call setup:
+
+>
+  require('diff-review').setup({
+    -- optional config
+  })
+<
+
+==============================================================================
+COMMANDS                                               *diff-review-commands*
+
+:DiffReview [args]                                     *:DiffReview*
+    Open the diff review window.
+    Args:
+      none            Review uncommitted changes
+      <ref>           Review changes from ref to HEAD
+      <base>..<head>  Review changes between two refs
+
+:DiffReviewClose                                       *:DiffReviewClose*
+    Close the diff review window.
+
+:DiffReviewList                                        *:DiffReviewList*
+    Show the review picker to switch between active reviews.
+
+:DiffReviewCopy [comments|full|diff]                   *:DiffReviewCopy*
+    Copy review output to clipboard.
+
+:DiffReviewSubmit                                      *:DiffReviewSubmit*
+    Submit review comments to GitHub (PR reviews only).
+
+==============================================================================
+KEYMAPS                                                  *diff-review-keymaps*
+
+File list panel (default):
+  j / k        Next/previous file
+  <CR>         Open diff for file
+  r            Refresh file list
+  <Tab>        Toggle directory fold (tree view)
+  o            Open directory (tree view)
+  O            Close directory (tree view)
+  <leader>t    Toggle tree/flat view
+  q            Close window
+
+Diff panel (default):
+  q            Close window
+  <leader>c    Add comment at cursor
+  <leader>e    Edit comment at cursor
+  <leader>d    Delete comment at cursor
+  <leader>l    List comments for current file
+  <leader>v    View all comments in quickfix
+
+==============================================================================
+CONFIGURATION                                          *diff-review-config*
+
+All options are optional. Defaults:
+
+>
+  require('diff-review').setup({
+    layout = {
+      file_list_width = 40,
+      min_width = 120,
+      min_height = 20,
+      position = "center",
+    },
+    keymaps = {
+      next_file = "j",
+      prev_file = "k",
+      select_file = "<CR>",
+      close = "q",
+      refresh = "r",
+      toggle_fold = "<Tab>",
+      open_directory = "o",
+      close_directory = "O",
+      add_comment = "<leader>c",
+      edit_comment = "<leader>e",
+      delete_comment = "<leader>d",
+      list_comments = "<leader>l",
+      view_all_comments = "<leader>v",
+    },
+    file_list = {
+      view_mode = "tree", -- "flat" or "tree"
+    },
+    git = {
+      base_branch = "main",
+      diff_args = {},
+    },
+    ui = {
+      border = "rounded",
+      show_icons = true,
+      colors = {
+        added = "DiffAdd",
+        removed = "DiffDelete",
+        modified = "DiffChange",
+        selected = "Visual",
+      },
+    },
+    diff = {
+      context_lines = 3,
+      ignore_whitespace = false,
+      syntax_highlighting = true,
+      tool = "git", -- "git" | "difftastic" | "delta" | "custom"
+      custom_command = "", -- used when tool = "custom", supports {args}
+    },
+  })
+<
+
+==============================================================================
+DIFF TOOLS                                              *diff-review-tools*
+
+By default the plugin uses git diff. To use alternative tools:
+
+>
+  require('diff-review').setup({
+    diff = {
+      tool = "difftastic", -- or "delta"
+    },
+  })
+<
+
+Custom diff tools can be configured with a command string that includes
+{args} to receive git diff arguments.
+
+>
+  require('diff-review').setup({
+    diff = {
+      tool = "custom",
+      custom_command = "my-diff-tool {args}",
+    },
+  })
+<
+
+==============================================================================
+NOTES                                                   *diff-review-notes*
+
+- Tree view mode is enabled by default.
+- nvim-web-devicons is optional. If installed, file icons are shown.
+
+==============================================================================
+vim:tw=78:ts=2:sw=2:et

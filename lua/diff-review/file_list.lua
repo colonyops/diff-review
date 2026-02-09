@@ -13,7 +13,7 @@ M.state = {
   files = {},
   current_index = 1,
   cached_file_stats = nil,  -- Cache for file stats to avoid repeated git calls
-  view_mode = "tree",  -- "flat" or "tree"
+  view_mode = (config.get().file_list and config.get().file_list.view_mode) or "tree",  -- "flat" or "tree"
   tree = nil,  -- Tree structure for tree view
   flat_tree = nil,  -- Flattened tree for rendering
 }
@@ -39,6 +39,60 @@ local function get_file_icon(filepath)
   return icon, color
 end
 
+-- Build tree connector lines for visual hierarchy
+local function build_tree_connectors(flat_tree, current_idx)
+  local connectors = {}
+
+  -- Track which depths have more siblings below
+  local has_more_at_depth = {}
+
+  -- Scan from bottom to top to determine tree structure
+  for i = #flat_tree, 1, -1 do
+    local entry = flat_tree[i]
+    local depth = entry.depth
+
+    -- Clear deeper levels when we go back up
+    for d = depth + 1, 10 do
+      has_more_at_depth[d] = false
+    end
+
+    -- Mark that this depth has content
+    has_more_at_depth[depth] = true
+
+    -- Build connector string for this entry
+    local connector = ""
+    for d = 1, depth - 1 do
+      if has_more_at_depth[d + 1] then
+        connector = connector .. "│  "
+      else
+        connector = connector .. "   "
+      end
+    end
+
+    -- Add branch character for the current depth
+    if depth > 0 then
+      -- Check if there are more entries at same or deeper depth after this one
+      local is_last = true
+      local parent_depth = depth - 1
+      for j = i + 1, #flat_tree do
+        if flat_tree[j].depth <= parent_depth then
+          break
+        end
+        if flat_tree[j].depth == depth then
+          is_last = false
+          break
+        end
+      end
+
+      connector = connector .. (is_last and "└─ " or "├─ ")
+    end
+
+    connectors[i] = connector
+  end
+
+  return connectors
+end
+
 -- Render tree view
 local function render_tree_view(state, lines, highlights)
   local tree_view = require("diff-review.tree_view")
@@ -60,26 +114,39 @@ local function render_tree_view(state, lines, highlights)
   end
   local file_stats = M.state.cached_file_stats
 
-  for _, entry in ipairs(M.state.flat_tree) do
+  -- Build tree connectors for visual hierarchy
+  local connectors = build_tree_connectors(M.state.flat_tree, M.state.current_index)
+
+  for idx, entry in ipairs(M.state.flat_tree) do
     local node = entry.node
     local depth = entry.depth
     local index = entry.index
 
-    -- Indentation
-    local indent = string.rep("  ", depth)
+    -- Get tree connector for this entry
+    local tree_prefix = connectors[idx] or ""
     local prefix = ""
 
     if node.type == "directory" then
       -- Directory node
-      local icon = node.expanded and "▼" or "▶"
-      local line = string.format("  %s%s %s/", indent, icon, node.name)
+      local icon = node.expanded and "▾" or "▸"
+      local line = string.format("  %s%s %s/", tree_prefix, icon, node.name)
       table.insert(lines, line)
 
-      -- Highlight directory icon
+      -- Highlight tree connectors
+      local connector_hl = "NonText"
       table.insert(highlights, {
         line = #lines - 1,
-        col = #indent + 2,
-        end_col = #indent + 3,
+        col = 2,
+        end_col = 2 + #tree_prefix,
+        hl_group = connector_hl,
+      })
+
+      -- Highlight directory icon and name
+      local icon_col = 2 + #tree_prefix
+      table.insert(highlights, {
+        line = #lines - 1,
+        col = icon_col,
+        end_col = icon_col + #icon + 1 + #node.name + 1,  -- icon + space + name + /
         hl_group = "Directory",
       })
     else
@@ -113,10 +180,10 @@ local function render_tree_view(state, lines, highlights)
         end
       end
 
-      local line = string.format("%s%s%s %s%s%s%s", prefix, indent, status_info.icon, icon_part, node.name, stats_part, comment_part)
+      local line = string.format("%s%s%s %s%s%s%s", prefix, tree_prefix, status_info.icon, icon_part, node.name, stats_part, comment_part)
       table.insert(lines, line)
 
-      local col = #prefix + #indent
+      local col = #prefix + #tree_prefix
 
       -- Highlight status icon
       table.insert(highlights, {
@@ -495,6 +562,43 @@ function M.toggle_fold()
     M.state.flat_tree = nil  -- Force rebuild
     M.render()
   end
+end
+
+local function set_fold_state(expanded)
+  if M.state.view_mode ~= "tree" or not M.state.tree then
+    return
+  end
+
+  local layout = require("diff-review.layout")
+  local state = layout.get_state()
+
+  if not state.file_list_win or not vim.api.nvim_win_is_valid(state.file_list_win) then
+    return
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(state.file_list_win)
+  local line_num = cursor[1] - 1
+
+  if line_num < 1 or line_num > #M.state.flat_tree then
+    return
+  end
+
+  local entry = M.state.flat_tree[line_num]
+  if entry.node.type == "directory" then
+    local tree_view = require("diff-review.tree_view")
+    if tree_view.set_directory_expanded(M.state.tree, entry.node.path, expanded) then
+      M.state.flat_tree = nil
+      M.render()
+    end
+  end
+end
+
+function M.open_fold()
+  set_fold_state(true)
+end
+
+function M.close_fold()
+  set_fold_state(false)
 end
 
 return M

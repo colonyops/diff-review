@@ -131,6 +131,30 @@ function M.toggle_directory(tree, path)
   return false
 end
 
+-- Set directory expansion state
+function M.set_directory_expanded(tree, path, expanded)
+  local parts = vim.split(path, "/", { plain = true })
+  local current = tree
+
+  for _, part in ipairs(parts) do
+    if current.children[part] then
+      current = current.children[part]
+    else
+      return false
+    end
+  end
+
+  if current.type == "directory" then
+    if current.expanded == expanded then
+      return false
+    end
+    current.expanded = expanded
+    return true
+  end
+
+  return false
+end
+
 -- Find the file index for a given path in the flat file list
 function M.find_file_index(files, path)
   for i, file in ipairs(files) do

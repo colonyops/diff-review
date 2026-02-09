@@ -21,12 +21,19 @@ M.defaults = {
     close = "q",
     refresh = "r",
     toggle_fold = "<Tab>",
+    open_directory = "o",
+    close_directory = "O",
     -- Comment keymaps
     add_comment = "<leader>c",
     edit_comment = "<leader>e",
     delete_comment = "<leader>d",
     list_comments = "<leader>l",
     view_all_comments = "<leader>v",
+  },
+
+  -- File list options
+  file_list = {
+    view_mode = "tree",  -- "flat" or "tree"
   },
 
   -- Git options

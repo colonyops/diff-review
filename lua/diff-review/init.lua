@@ -23,22 +23,65 @@ M.setup = function(opts)
   -- Create user commands
   vim.api.nvim_create_user_command("DiffReview", function(opts)
     local parser = require("diff-review.parser")
-    local parsed = parser.parse_args(opts.args)
+    local function open_parsed(parsed)
+      local valid, err = parser.validate(parsed)
+      if not valid then
+        vim.notify("Invalid arguments: " .. err, vim.log.levels.ERROR)
+        return
+      end
 
-    -- Validate
-    local valid, err = parser.validate(parsed)
-    if not valid then
-      vim.notify("Invalid arguments: " .. err, vim.log.levels.ERROR)
+      require("diff-review.layout").open(
+        parsed.type,
+        parsed.base,
+        parsed.head,
+        parsed.pr_number
+      )
+    end
+
+    if not opts.args or opts.args == "" then
+      vim.ui.select(
+        { "uncommitted", "ref", "range", "pr" },
+        { prompt = "DiffReview type" },
+        function(choice)
+          if not choice then
+            return
+          end
+
+          if choice == "uncommitted" then
+            open_parsed(parser.parse_args(""))
+          elseif choice == "ref" then
+            vim.ui.input({ prompt = "Base ref" }, function(ref)
+              if not ref or ref == "" then
+                return
+              end
+              open_parsed(parser.parse_args(ref))
+            end)
+          elseif choice == "range" then
+            vim.ui.input({ prompt = "Base ref" }, function(base)
+              if not base or base == "" then
+                return
+              end
+              vim.ui.input({ prompt = "Head ref" }, function(head)
+                if not head or head == "" then
+                  return
+                end
+                open_parsed(parser.parse_args(base .. ".." .. head))
+              end)
+            end)
+          elseif choice == "pr" then
+            vim.ui.input({ prompt = "PR number" }, function(pr_number)
+              if not pr_number or pr_number == "" then
+                return
+              end
+              open_parsed(parser.parse_args("pr:" .. pr_number))
+            end)
+          end
+        end
+      )
       return
     end
 
-    -- Open with parsed context
-    require("diff-review.layout").open(
-      parsed.type,
-      parsed.base,
-      parsed.head,
-      parsed.pr_number
-    )
+    open_parsed(parser.parse_args(opts.args))
   end, {
     desc = "Open diff review window",
     nargs = "?",  -- Optional arguments
@@ -96,6 +139,10 @@ M.setup = function(opts)
       return { "comments", "full", "diff" }
     end,
   })
+
+  vim.api.nvim_create_user_command("DiffReviewSubmit", function()
+    require("diff-review.submit").submit_current_review()
+  end, { desc = "Submit review comments to GitHub" })
 end
 
 M.config = config

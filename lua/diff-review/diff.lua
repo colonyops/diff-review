@@ -3,22 +3,57 @@ local M = {}
 local config = require("diff-review.config")
 
 -- Execute git command and return output
-local function exec_git(args)
-  local cmd = "git " .. table.concat(args, " ") .. " 2>&1"
+local function exec_cmd(cmd)
   local handle = io.popen(cmd)
   if not handle then
-    return nil, "Failed to execute git command"
+    return nil, "Failed to execute command"
   end
 
   local result = handle:read("*a")
   local success = handle:close()
 
-  -- Check if command failed
   if not success or result:match("^fatal:") or result:match("^error:") then
     return nil, result
   end
 
   return result, nil
+end
+
+local function shell_join(args)
+  local escaped = {}
+  for _, arg in ipairs(args) do
+    table.insert(escaped, vim.fn.shellescape(arg))
+  end
+  return table.concat(escaped, " ")
+end
+
+local function exec_git(args)
+  local cmd = "git " .. table.concat(args, " ") .. " 2>&1"
+  return exec_cmd(cmd)
+end
+
+local function run_diff_tool(tool, args, opts)
+  if tool == "difftastic" then
+    local cmd = "difft " .. shell_join(args) .. " --color=never 2>&1"
+    return exec_cmd(cmd)
+  elseif tool == "delta" then
+    local git_args = vim.deepcopy(args)
+    table.insert(git_args, "--color=never")
+    local cmd = "git " .. shell_join(git_args) .. " | delta --color=never --paging=never 2>&1"
+    return exec_cmd(cmd)
+  elseif tool == "custom" and opts.diff.custom_command and opts.diff.custom_command ~= "" then
+    local args_str = shell_join(args)
+    local cmd = opts.diff.custom_command
+    if cmd:find("{args}") then
+      cmd = cmd:gsub("{args}", args_str)
+    else
+      cmd = cmd .. " " .. args_str
+    end
+    cmd = cmd .. " 2>&1"
+    return exec_cmd(cmd)
+  end
+
+  return exec_git(args)
 end
 
 -- Parse git status to get changed files
@@ -97,10 +132,54 @@ local function parse_diff_name_status(output)
   return files
 end
 
+local function split_diff_by_file(diff_output)
+  local by_file = {}
+  local current_file = nil
+  local buffer = {}
+
+  for line in diff_output:gmatch("[^\r\n]+") do
+    local old_path, new_path = line:match("^diff %-%-git a/(.+) b/(.+)$")
+    if old_path and new_path then
+      if current_file then
+        by_file[current_file] = table.concat(buffer, "\n")
+      end
+      current_file = new_path
+      buffer = { line }
+    elseif current_file then
+      table.insert(buffer, line)
+    end
+  end
+
+  if current_file then
+    by_file[current_file] = table.concat(buffer, "\n")
+  end
+
+  return by_file
+end
+
 -- Get line stats for all changed files
 function M.get_file_stats()
   local reviews = require("diff-review.reviews")
   local review = reviews.get_current()
+
+  if review and review.type == "pr" then
+    local github = require("diff-review.github")
+    local files, err = github.get_pr_files(review.pr_number)
+    if err then
+      vim.notify("GitHub files fetch failed: " .. err, vim.log.levels.ERROR)
+      return {}
+    end
+    local stats = {}
+    for _, file in ipairs(files) do
+      if file.path then
+        stats[file.path] = {
+          additions = file.additions or 0,
+          deletions = file.deletions or 0,
+        }
+      end
+    end
+    return stats
+  end
 
   local args = { "diff", "--numstat" }
 
@@ -111,7 +190,11 @@ function M.get_file_stats()
   end
 
   local output, err = exec_git(args)
-  if err or not output or output == "" then
+  if err then
+    vim.notify("Git diff stats failed: " .. err, vim.log.levels.ERROR)
+    return {}
+  end
+  if not output or output == "" then
     return {}
   end
 
@@ -141,11 +224,40 @@ function M.get_changed_files()
 
   if not review or review.type == "uncommitted" then
     -- Get staged and unstaged changes
-    local status_output = exec_git({ "status", "--porcelain" })
+    local status_output, err = exec_git({ "status", "--porcelain" })
+    if err then
+      vim.notify("Git status failed: " .. err, vim.log.levels.ERROR)
+      return {}
+    end
     if not status_output or status_output == "" then
       return {}
     end
     return parse_status(status_output)
+  end
+
+  if review.type == "pr" then
+    local github = require("diff-review.github")
+    local files, err = github.get_pr_files(review.pr_number)
+    if err then
+      vim.notify("GitHub files fetch failed: " .. err, vim.log.levels.ERROR)
+      return {}
+    end
+    local status_map = {
+      added = "A",
+      removed = "D",
+      modified = "M",
+      renamed = "R",
+    }
+    local result = {}
+    for _, file in ipairs(files) do
+      if file.path then
+        table.insert(result, {
+          status = status_map[file.status] or "M",
+          path = file.path,
+        })
+      end
+    end
+    return result
   end
 
   -- For ref and range reviews, use git diff --name-status
@@ -177,9 +289,25 @@ function M.get_file_diff(file)
   local review = reviews.get_current()
 
   local args = { "diff" }
+  local tool = opts.diff.tool or "git"
+
+  if review and review.type == "pr" then
+    local github = require("diff-review.github")
+    local pr_diff, err = github.get_pr_diff(review.pr_number)
+    if err then
+      vim.notify("GitHub diff fetch failed: " .. err, vim.log.levels.ERROR)
+      return ""
+    end
+    local by_file = split_diff_by_file(pr_diff or "")
+    return by_file[file.path] or ""
+  end
 
   -- Add context lines
-  table.insert(args, "-U" .. opts.diff.context_lines)
+  local context_lines = opts.diff.context_lines
+  if file.status == "D" then
+    context_lines = 99999
+  end
+  table.insert(args, "-U" .. context_lines)
 
   -- Ignore whitespace if configured
   if opts.diff.ignore_whitespace then
@@ -202,20 +330,32 @@ function M.get_file_diff(file)
   table.insert(args, "--")
   table.insert(args, file.path)
 
-  local diff_output = exec_git(args)
+  local diff_output, diff_err = run_diff_tool(tool, args, opts)
+  if diff_err then
+    vim.notify("Diff command failed: " .. diff_err, vim.log.levels.ERROR)
+    if tool ~= "git" then
+      diff_output = exec_git(args)
+    end
+  end
 
   -- For uncommitted changes, also try staged if no unstaged diff
   if not diff_output or diff_output == "" then
     if not review or review.type == "uncommitted" then
       args = { "diff", "--cached" }
-      table.insert(args, "-U" .. opts.diff.context_lines)
+      table.insert(args, "-U" .. context_lines)
       if opts.diff.ignore_whitespace then
         table.insert(args, "-w")
       end
       table.insert(args, "--")
       table.insert(args, file.path)
 
-      diff_output = exec_git(args)
+      diff_output, diff_err = run_diff_tool(tool, args, opts)
+      if diff_err then
+        vim.notify("Diff command failed: " .. diff_err, vim.log.levels.ERROR)
+        if tool ~= "git" then
+          diff_output = exec_git(args)
+        end
+      end
     end
   end
 

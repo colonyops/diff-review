@@ -29,19 +29,38 @@ local function get_window_config()
   local width = vim.o.columns
   local height = vim.o.lines - vim.o.cmdheight - 2
 
-  -- Ensure minimum dimensions
-  if width < opts.layout.min_width then
-    width = opts.layout.min_width
+  -- Warn if below minimum dimensions (but keep actual size)
+  if width < opts.layout.min_width or height < opts.layout.min_height then
+    vim.notify(
+      string.format(
+        "diff-review.nvim: window too small (need %dx%d, have %dx%d)",
+        opts.layout.min_width,
+        opts.layout.min_height,
+        width,
+        height
+      ),
+      vim.log.levels.WARN
+    )
   end
-  if height < opts.layout.min_height then
-    height = opts.layout.min_height
+
+  local file_list_width = math.min(opts.layout.file_list_width, width - 1)
+  if file_list_width < 1 then
+    file_list_width = 1
+  end
+  local diff_width = width - file_list_width - 1
+  if diff_width < 1 then
+    diff_width = 1
+    file_list_width = width - diff_width - 1
+    if file_list_width < 1 then
+      file_list_width = 1
+    end
   end
 
   return {
     width = width,
     height = height,
-    file_list_width = opts.layout.file_list_width,
-    diff_width = width - opts.layout.file_list_width - 1,
+    file_list_width = file_list_width,
+    diff_width = diff_width,
   }
 end
 
@@ -49,6 +68,15 @@ end
 function M.open(review_type, base, head, pr_number)
   if M.state.is_open then
     return
+  end
+
+  if review_type == "pr" then
+    local github = require("diff-review.github")
+    local ok, err = github.is_authenticated()
+    if not ok then
+      vim.notify("GitHub auth required: " .. err, vim.log.levels.ERROR)
+      return
+    end
   end
 
   -- Initialize review context
@@ -99,6 +127,16 @@ function M.open(review_type, base, head, pr_number)
 
   -- Setup keymaps
   M.setup_keymaps()
+
+  -- Cursor comment visibility
+  local ui = require("diff-review.ui")
+  ui.update_cursor_comment()
+  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+    buffer = M.state.diff_buf,
+    callback = function()
+      ui.update_cursor_comment()
+    end,
+  })
 
   -- Focus file list
   vim.api.nvim_set_current_win(M.state.file_list_win)
@@ -153,6 +191,8 @@ function M.setup_keymaps()
   vim.keymap.set("n", opts.keymaps.select_file, require("diff-review.file_list").select_file, keymap_opts)
   vim.keymap.set("n", opts.keymaps.refresh, require("diff-review.file_list").refresh, keymap_opts)
   vim.keymap.set("n", opts.keymaps.toggle_fold, require("diff-review.file_list").toggle_fold, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.open_directory, require("diff-review.file_list").open_fold, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.close_directory, require("diff-review.file_list").close_fold, keymap_opts)
   vim.keymap.set("n", "<leader>t", require("diff-review.file_list").toggle_view_mode, keymap_opts)
 
   -- Diff window keymaps
