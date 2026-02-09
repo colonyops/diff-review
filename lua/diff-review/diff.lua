@@ -2,6 +2,9 @@ local M = {}
 
 local config = require("diff-review.config")
 
+-- Module-level line mapping cache
+M._line_mapping = nil
+
 -- Execute git command and return output
 local function exec_cmd(cmd)
   local handle = io.popen(cmd)
@@ -362,6 +365,96 @@ function M.get_file_diff(file)
   return diff_output or ""
 end
 
+-- Build line number mapping for diff view navigation
+-- Maps display line numbers to file line numbers and types
+local function build_line_mapping(diff_output)
+  local mapping = {}
+  local display_line = 1
+  local new_file_line = 0
+  local old_file_line = 0
+
+  for line in diff_output:gmatch("[^\r\n]+") do
+    -- Match hunk header: @@ -start,count +start,count @@
+    local old_start, old_count, new_start, new_count = line:match("^@@ %-(%d+),?(%d*) %+(%d+),?(%d*) @@")
+    if old_start then
+      -- Hunk header line
+      new_file_line = tonumber(new_start)
+      old_file_line = tonumber(old_start)
+      mapping[display_line] = {
+        type = "header",
+        file_line = nil,
+        old_line = old_file_line,
+        new_line = new_file_line,
+      }
+    else
+      local prefix = line:sub(1, 1)
+      if prefix == "+" and not line:match("^%+%+%+") then
+        -- Added line
+        mapping[display_line] = {
+          type = "add",
+          file_line = new_file_line,
+          new_line = new_file_line,
+        }
+        new_file_line = new_file_line + 1
+      elseif prefix == "-" and not line:match("^%-%-%-") then
+        -- Deleted line
+        mapping[display_line] = {
+          type = "delete",
+          file_line = old_file_line,
+          old_line = old_file_line,
+        }
+        old_file_line = old_file_line + 1
+      elseif prefix == " " then
+        -- Context line
+        mapping[display_line] = {
+          type = "context",
+          file_line = new_file_line,
+          old_line = old_file_line,
+          new_line = new_file_line,
+        }
+        new_file_line = new_file_line + 1
+        old_file_line = old_file_line + 1
+      else
+        -- Other lines (file headers, etc)
+        mapping[display_line] = {
+          type = "header",
+          file_line = nil,
+        }
+      end
+    end
+    display_line = display_line + 1
+  end
+
+  return mapping
+end
+
+-- Get file line number at cursor position
+function M.get_file_line_at_cursor()
+  if not M._line_mapping then
+    return nil
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local display_line = cursor[1]
+  local mapping_entry = M._line_mapping[display_line]
+
+  if not mapping_entry then
+    return nil
+  end
+
+  return {
+    file_line = mapping_entry.file_line,
+    type = mapping_entry.type,
+    old_line = mapping_entry.old_line,
+    new_line = mapping_entry.new_line,
+  }
+end
+
+-- Clear line mapping cache
+function M.clear_line_mapping()
+  M._line_mapping = nil
+end
+
 -- Parse diff output into structured format
 function M.parse_diff(diff_output)
   local hunks = {}
@@ -502,8 +595,14 @@ function M.show_file_diff(file)
     return
   end
 
+  -- Clear previous line mapping
+  M.clear_line_mapping()
+
   -- Get diff content
   local diff_output = M.get_file_diff(file)
+
+  -- Build line mapping for navigation
+  M._line_mapping = build_line_mapping(diff_output)
 
   local opts = config.get()
   local lines, line_types
