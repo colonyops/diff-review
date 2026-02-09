@@ -395,6 +395,107 @@ function M.parse_diff(diff_output)
 end
 
 -- Show diff for a file in the diff panel
+-- Parse diff and extract clean code with line metadata
+local function parse_diff_with_syntax(diff_output)
+  local lines = {}
+  local line_types = {} -- "add", "delete", "context", "header"
+
+  for line in diff_output:gmatch("[^\r\n]+") do
+    local prefix = line:sub(1, 1)
+    if prefix == "+" and not line:match("^%+%+%+") then
+      -- Added line - strip the + prefix
+      table.insert(lines, line:sub(2))
+      table.insert(line_types, "add")
+    elseif prefix == "-" and not line:match("^%-%-%-") then
+      -- Deleted line - strip the - prefix
+      table.insert(lines, line:sub(2))
+      table.insert(line_types, "delete")
+    elseif prefix == " " then
+      -- Context line - strip the space prefix
+      table.insert(lines, line:sub(2))
+      table.insert(line_types, "context")
+    elseif line:match("^@@") or line:match("^diff ") or line:match("^index ") then
+      -- Hunk header or diff metadata
+      table.insert(lines, line)
+      table.insert(line_types, "header")
+    else
+      -- Other lines (file headers, etc)
+      table.insert(lines, line)
+      table.insert(line_types, "header")
+    end
+  end
+
+  return lines, line_types
+end
+
+-- Apply diff signs to show add/delete indicators
+local function apply_diff_signs(buf, line_types)
+  local sign_ns = "diff_review_signs"
+
+  -- Define signs if not already defined
+  pcall(vim.fn.sign_define, "DiffReviewAdd", {
+    text = "+",
+    texthl = "DiffAdd",
+  })
+  pcall(vim.fn.sign_define, "DiffReviewDelete", {
+    text = "-",
+    texthl = "DiffDelete",
+  })
+
+  -- Clear existing signs
+  vim.fn.sign_unplace(sign_ns, { buffer = buf })
+
+  -- Place signs for each line
+  for i, line_type in ipairs(line_types) do
+    if line_type == "add" then
+      vim.fn.sign_place(0, sign_ns, "DiffReviewAdd", buf, { lnum = i, priority = 10 })
+    elseif line_type == "delete" then
+      vim.fn.sign_place(0, sign_ns, "DiffReviewDelete", buf, { lnum = i, priority = 10 })
+    end
+  end
+end
+
+-- Detect filetype from file path
+local function detect_filetype(filepath)
+  local ext = filepath:match("%.([^%.]+)$")
+  if not ext then
+    return nil
+  end
+
+  -- Common mappings
+  local ext_to_ft = {
+    js = "javascript",
+    jsx = "javascriptreact",
+    ts = "typescript",
+    tsx = "typescriptreact",
+    py = "python",
+    rb = "ruby",
+    go = "go",
+    rs = "rust",
+    c = "c",
+    cpp = "cpp",
+    h = "c",
+    hpp = "cpp",
+    java = "java",
+    lua = "lua",
+    vim = "vim",
+    sh = "sh",
+    bash = "bash",
+    zsh = "zsh",
+    md = "markdown",
+    json = "json",
+    yaml = "yaml",
+    yml = "yaml",
+    toml = "toml",
+    html = "html",
+    css = "css",
+    scss = "scss",
+    xml = "xml",
+  }
+
+  return ext_to_ft[ext] or ext
+end
+
 function M.show_file_diff(file)
   local layout = require("diff-review.layout")
   local state = layout.get_state()
@@ -406,10 +507,18 @@ function M.show_file_diff(file)
   -- Get diff content
   local diff_output = M.get_file_diff(file)
 
-  -- Split into lines
-  local lines = {}
-  for line in diff_output:gmatch("[^\r\n]+") do
-    table.insert(lines, line)
+  local opts = config.get()
+  local lines, line_types
+
+  -- Parse diff for syntax highlighting
+  if opts.diff.syntax_highlighting then
+    lines, line_types = parse_diff_with_syntax(diff_output)
+  else
+    -- Original behavior - just split lines
+    lines = {}
+    for line in diff_output:gmatch("[^\r\n]+") do
+      table.insert(lines, line)
+    end
   end
 
   -- If no diff output, show message
@@ -422,6 +531,7 @@ function M.show_file_diff(file)
       "  - Binary",
       "  - Empty",
     }
+    line_types = nil
   end
 
   -- Make buffer modifiable
@@ -431,8 +541,17 @@ function M.show_file_diff(file)
   vim.api.nvim_buf_set_lines(state.diff_buf, 0, -1, false, lines)
 
   -- Apply syntax highlighting
-  local opts = config.get()
-  if opts.diff.syntax_highlighting then
+  if opts.diff.syntax_highlighting and line_types then
+    -- Detect and set the actual file's filetype for proper syntax highlighting
+    local filetype = detect_filetype(file.path)
+    if filetype then
+      vim.api.nvim_buf_set_option(state.diff_buf, "filetype", filetype)
+    end
+
+    -- Apply diff signs to show add/delete indicators
+    apply_diff_signs(state.diff_buf, line_types)
+  else
+    -- Fallback to diff filetype
     vim.api.nvim_buf_set_option(state.diff_buf, "filetype", "diff")
   end
 

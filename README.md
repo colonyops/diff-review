@@ -10,7 +10,7 @@ A Neovim plugin for reviewing git diffs and pull requests with an intuitive spli
 - 💬 Inline review comments with counts per file
 - ➕➖ Line change stats per file
 - ⌨️  Vim-style navigation and folding controls
-- 🎨 Syntax highlighting for diffs
+- 🎨 Syntax highlighting with treesitter (strips +/- and shows in gutter)
 - ⚙️  Configurable keymaps, UI, and diff tools
 
 ## Installation
@@ -132,7 +132,7 @@ require('diff-review').setup({
   diff = {
     context_lines = 3,
     ignore_whitespace = false,
-    syntax_highlighting = true,
+    syntax_highlighting = true, -- Use treesitter to highlight code, show +/- in sign column
     tool = "git", -- "git" | "difftastic" | "delta" | "custom"
     custom_command = "", -- used when tool = "custom", supports {args}
   },
