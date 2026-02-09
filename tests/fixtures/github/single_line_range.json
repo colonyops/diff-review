@@ -1,0 +1,16 @@
+{
+  "file": "src/example.lua",
+  "text": "Single line range comment",
+  "line_range": {
+    "start": 4,
+    "end": 4
+  },
+  "expected_output": {
+    "path": "src/example.lua",
+    "start_line": 4,
+    "line": 4,
+    "side": "RIGHT",
+    "start_side": "RIGHT",
+    "body": "Single line range comment"
+  }
+}

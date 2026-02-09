@@ -168,4 +168,53 @@ function M.reset_module(module_name)
   return require(module_name)
 end
 
+-- Load a fixture file
+function M.load_fixture(name)
+  local fixtures_path = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h") .. "/fixtures/"
+  local path = fixtures_path .. name
+  local file = io.open(path, "r")
+  if not file then
+    error("Failed to load fixture: " .. path)
+  end
+  local content = file:read("*a")
+  file:close()
+  return content
+end
+
+-- Load a JSON fixture file
+function M.load_json_fixture(name)
+  local content = M.load_fixture(name)
+  local ok, data = pcall(vim.json.decode, content)
+  if not ok then
+    error("Failed to parse JSON fixture: " .. name)
+  end
+  return data
+end
+
+-- Get the path to a fixture file
+function M.fixture_path(name)
+  local fixtures_path = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h") .. "/fixtures/"
+  return fixtures_path .. name
+end
+
+-- Load a private (local) function from a module for testing
+-- This uses debug.getupvalue to access local functions
+function M.load_private_function(module, func_name)
+  -- Look through all functions in the module to find one that has the private function as an upvalue
+  for key, value in pairs(module) do
+    if type(value) == "function" then
+      local i = 1
+      while true do
+        local name, func = debug.getupvalue(value, i)
+        if not name then break end
+        if name == func_name and type(func) == "function" then
+          return func
+        end
+        i = i + 1
+      end
+    end
+  end
+  error("Private function not found: " .. func_name)
+end
+
 return M

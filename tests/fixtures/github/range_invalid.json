@@ -1,0 +1,10 @@
+{
+  "file": "src/example.lua",
+  "text": "This range spans both sides",
+  "line_range": {
+    "start": 3,
+    "end": 4
+  },
+  "expected_error": "Range spans both sides of the diff",
+  "note": "Line 3 is on LEFT (deleted), line 4 is on RIGHT (added)"
+}

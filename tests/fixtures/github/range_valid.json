@@ -1,0 +1,16 @@
+{
+  "file": "src/example.lua",
+  "text": "Consider adding error handling here",
+  "line_range": {
+    "start": 4,
+    "end": 6
+  },
+  "expected_output": {
+    "path": "src/example.lua",
+    "start_line": 4,
+    "line": 6,
+    "side": "RIGHT",
+    "start_side": "RIGHT",
+    "body": "Consider adding error handling here"
+  }
+}

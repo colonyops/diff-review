@@ -1,0 +1,5 @@
+ M src/example.lua
+ A src/new_file.lua
+ D src/old_file.lua
+MM src/staged_and_modified.lua
+A  src/staged_new.lua

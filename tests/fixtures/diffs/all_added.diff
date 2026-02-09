@@ -1,0 +1,14 @@
+diff --git a/src/new_file.lua b/src/new_file.lua
+new file mode 100644
+index 0000000..abcdefg
+--- /dev/null
++++ b/src/new_file.lua
+@@ -0,0 +1,10 @@
++local M = {}
++
++function M.new_function()
++  print("This is new")
++  return true
++end
++
++return M

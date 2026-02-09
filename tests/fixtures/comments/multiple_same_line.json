@@ -1,0 +1,23 @@
+[
+  {
+    "id": "comment-1",
+    "file": "src/example.lua",
+    "line": 5,
+    "text": "First comment on line 5",
+    "timestamp": 1234567890
+  },
+  {
+    "id": "comment-2",
+    "file": "src/example.lua",
+    "line": 5,
+    "text": "Second comment on line 5",
+    "timestamp": 1234567900
+  },
+  {
+    "id": "comment-3",
+    "file": "src/example.lua",
+    "line": 5,
+    "text": "Third comment on line 5",
+    "timestamp": 1234567910
+  }
+]

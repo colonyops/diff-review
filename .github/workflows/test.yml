@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, feat/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        nvim-version: ['stable', 'nightly']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Neovim ${{ matrix.nvim-version }}
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim-version }}
+
+      - name: Install plenary.nvim
+        run: |
+          mkdir -p ~/.local/share/nvim/site/pack/vendor/start
+          git clone --depth 1 https://github.com/nvim-lua/plenary.nvim \
+            ~/.local/share/nvim/site/pack/vendor/start/plenary.nvim
+
+      - name: Run unit tests
+        run: |
+          nvim --headless --noplugin -u tests/minimal_init.lua \
+            -c "lua require('plenary.test_harness').test_directory('tests/unit', { minimal_init = 'tests/minimal_init.lua' })"
+
+      - name: Run integration tests
+        run: |
+          nvim --headless --noplugin -u tests/minimal_init.lua \
+            -c "lua require('plenary.test_harness').test_directory('tests/integration', { minimal_init = 'tests/minimal_init.lua' })"
+
+      - name: Run E2E tests
+        run: |
+          nvim --headless --noplugin -u tests/minimal_init.lua \
+            -c "lua require('plenary.test_harness').test_directory('tests/e2e', { minimal_init = 'tests/minimal_init.lua' })"

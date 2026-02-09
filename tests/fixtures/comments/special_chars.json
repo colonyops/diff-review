@@ -1,0 +1,23 @@
+[
+  {
+    "id": "comment-1",
+    "file": "src/example.lua",
+    "line": 5,
+    "text": "This has \"quotes\" and 'apostrophes'",
+    "timestamp": 1234567890
+  },
+  {
+    "id": "comment-2",
+    "file": "src/example.lua",
+    "line": 10,
+    "text": "Line 1\nLine 2\nLine 3",
+    "timestamp": 1234567900
+  },
+  {
+    "id": "comment-3",
+    "file": "src/example.lua",
+    "line": 15,
+    "text": "Special chars: @#$%^&*()[]{}",
+    "timestamp": 1234567910
+  }
+]
