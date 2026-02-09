@@ -16,9 +16,22 @@ M.setup = function(opts)
   local ui = require("diff-review.ui")
   ui.init()
 
+  -- Initialize note UI (signs, highlights)
+  local note_ui = require("diff-review.note_ui")
+  note_ui.init()
+
   -- Setup auto-save for comments
   local reviews = require("diff-review.reviews")
   reviews.setup_auto_save()
+
+  -- Restore note mode session if needed
+  local note_mode = require("diff-review.note_mode")
+  vim.api.nvim_create_autocmd("VimEnter", {
+    callback = function()
+      note_mode.restore_session()
+    end,
+    once = true,
+  })
 
   -- Create user commands
   vim.api.nvim_create_user_command("DiffReview", function(opts)
@@ -201,6 +214,110 @@ M.setup = function(opts)
 
     vim.notify(table.concat(status, "\n"), vim.log.levels.INFO)
   end, { desc = "Check diff-review health and diagnose issues" })
+
+  -- Note mode commands
+  vim.api.nvim_create_user_command("DiffReviewNoteEnter", function(opts)
+    local set_name = opts.args and opts.args ~= "" and opts.args or "default"
+    require("diff-review.note_mode").enter(set_name)
+  end, {
+    desc = "Enter note mode",
+    nargs = "?",
+  })
+
+  vim.api.nvim_create_user_command("DiffReviewNoteExit", function()
+    require("diff-review.note_mode").exit()
+  end, { desc = "Exit note mode" })
+
+  vim.api.nvim_create_user_command("DiffReviewNoteToggle", function(opts)
+    local set_name = opts.args and opts.args ~= "" and opts.args or "default"
+    require("diff-review.note_mode").toggle(set_name)
+  end, {
+    desc = "Toggle note mode",
+    nargs = "?",
+  })
+
+  vim.api.nvim_create_user_command("DiffReviewNoteClear", function()
+    local note_mode = require("diff-review.note_mode")
+    local state = note_mode.get_state()
+
+    if not state.is_active then
+      vim.notify("Note mode not active", vim.log.levels.WARN)
+      return
+    end
+
+    -- Confirm before clearing
+    vim.ui.select(
+      { "Yes", "No" },
+      { prompt = string.format("Clear all notes in set '%s'?", state.current_set) },
+      function(choice)
+        if choice == "Yes" then
+          local notes = require("diff-review.notes")
+          local count = notes.clear_set(state.current_set)
+          vim.notify(string.format("Cleared %d notes from set '%s'", count, state.current_set), vim.log.levels.INFO)
+
+          -- Refresh display
+          local note_ui = require("diff-review.note_ui")
+          note_ui.clear_all()
+        end
+      end
+    )
+  end, { desc = "Clear all notes in current set" })
+
+  vim.api.nvim_create_user_command("DiffReviewNoteList", function()
+    local note_persistence = require("diff-review.note_persistence")
+    local note_mode = require("diff-review.note_mode")
+    local state = note_mode.get_state()
+
+    local sets = note_persistence.list_sets()
+
+    if #sets == 0 then
+      vim.notify("No note sets found", vim.log.levels.INFO)
+      return
+    end
+
+    -- Format sets with indicator for current set
+    local display_sets = {}
+    for _, set in ipairs(sets) do
+      if state.is_active and set == state.current_set then
+        table.insert(display_sets, set .. " (active)")
+      else
+        table.insert(display_sets, set)
+      end
+    end
+
+    vim.ui.select(display_sets, { prompt = "Select note set" }, function(choice)
+      if not choice then
+        return
+      end
+
+      -- Remove " (active)" suffix if present
+      local selected_set = choice:gsub(" %(active%)$", "")
+
+      if state.is_active then
+        note_mode.switch_set(selected_set)
+      else
+        note_mode.enter(selected_set)
+      end
+    end)
+  end, { desc = "List and switch note sets" })
+
+  vim.api.nvim_create_user_command("DiffReviewNoteSwitch", function(opts)
+    local set_name = opts.args
+
+    if not set_name or set_name == "" then
+      vim.notify("Usage: DiffReviewNoteSwitch <set_name>", vim.log.levels.ERROR)
+      return
+    end
+
+    require("diff-review.note_mode").switch_set(set_name)
+  end, {
+    desc = "Switch to a different note set",
+    nargs = 1,
+    complete = function()
+      local note_persistence = require("diff-review.note_persistence")
+      return note_persistence.list_sets()
+    end,
+  })
 end
 
 M.config = config
