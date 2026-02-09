@@ -442,6 +442,82 @@ Export with annotated diff:
 :DiffReviewExport annotated
 ```
 
+## Troubleshooting
+
+### Layout fails to open or windows disappear
+
+If you see "Layout failed to open correctly" or the diff view doesn't appear, this is often caused by session restore plugins interfering with the layout creation.
+
+**Symptoms:**
+- Windows open briefly then disappear
+- "Layout failed to open" warning
+- More common when using `nvim -c "DiffReview ..."` from command line
+- May happen with other buffers/tabs already open
+
+**Solution for auto-session users:**
+
+Add this to the very top of your `init.lua` (before plugins load):
+
+```lua
+-- Disable auto-session when using -c commands
+for _, arg in ipairs(vim.v.argv) do
+  if arg == "-c" or arg == "+c" then
+    vim.g.auto_session_enabled = false
+    break
+  end
+end
+```
+
+Then update your auto-session config:
+
+```lua
+require("auto-session").setup({
+  -- Add DiffReview to bypass list
+  bypass_session_save_file_types = {
+    "", "blank", "alpha", "NvimTree", "nofile",
+    "Trouble", "dapui", "dap", "DiffReview"
+  },
+  -- Close diff-review before saving session
+  pre_save_cmds = {
+    "tabdo NvimTreeClose",
+    "silent! DiffReviewClose"
+  },
+})
+```
+
+And add conditional loading to the plugin spec:
+
+```lua
+{
+  "rmagatti/auto-session",
+  cond = function()
+    return vim.g.auto_session_enabled ~= false
+  end,
+  config = function()
+    -- your setup here
+  end,
+}
+```
+
+**Solution for other session plugins (persisted.nvim, possession, etc.):**
+
+Disable the plugin when starting with `-c` commands, or defer diff-review operations:
+
+```lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = "PersistedLoadPost", -- or your plugin's event
+  callback = function()
+    vim.defer_fn(function()
+      -- Safe to use diff-review now
+    end, 200)
+  end,
+})
+```
+
+**Health check:**
+
+Run `:DiffReviewHealth` to diagnose layout issues and detect session plugins.
+
 ## Development
 
 ### Project Structure
