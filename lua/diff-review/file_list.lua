@@ -20,12 +20,31 @@ M.state = {
 }
 
 -- Status icons and colors
-local status_icons = {
-  M = { icon = "●", hl = "DiffChange" },  -- Modified
-  A = { icon = "+", hl = "DiffAdd" },     -- Added
-  D = { icon = "-", hl = "DiffDelete" },  -- Deleted
-  R = { icon = "→", hl = "DiffChange" },  -- Renamed
-}
+local function get_status_icons()
+  local opts = config.get()
+  local status_cfg = opts.ui.status or {}
+
+  local symbols = status_cfg.symbols or {
+    modified = "M",
+    added = "A",
+    deleted = "D",
+    renamed = "R",
+  }
+
+  local highlights = status_cfg.highlights or {
+    modified = "DiffChange",
+    added = "DiffAdd",
+    deleted = "DiffDelete",
+    renamed = "DiffReviewRenamed",
+  }
+
+  return {
+    M = { icon = symbols.modified, hl = highlights.modified },
+    A = { icon = symbols.added, hl = highlights.added },
+    D = { icon = symbols.deleted, hl = highlights.deleted },
+    R = { icon = symbols.renamed, hl = highlights.renamed },
+  }
+end
 
 local function get_repo_root_name()
   local root = vim.fn.system("git rev-parse --show-toplevel 2>/dev/null"):gsub("\n", "")
@@ -170,7 +189,7 @@ local function render_tree_view(state, lines, highlights)
     else
       -- File node
       local file = node.file_data
-      local status_info = status_icons[file.status] or { icon = "?", hl = "Normal" }
+      local status_info = get_status_icons()[file.status] or { icon = "?", hl = "Normal" }
 
       -- Selection indicator
       prefix = (index == M.state.current_index) and "> " or "  "
@@ -335,7 +354,7 @@ function M.render()
     local file_stats = M.state.cached_file_stats
 
     for i, file in ipairs(M.state.files) do
-      local status_info = status_icons[file.status] or { icon = "?", hl = "Normal" }
+      local status_info = get_status_icons()[file.status] or { icon = "?", hl = "Normal" }
       local prefix = (i == M.state.current_index) and "> " or "  "
 
       -- Get file icon if available

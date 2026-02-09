@@ -19,4 +19,51 @@ You should see:
 
 ## Automated Testing
 
-TODO: Add automated tests with plenary.nvim
+Tests are written using [plenary.nvim](https://github.com/nvim-lua/plenary.nvim).
+
+### Running Tests
+
+Run all tests:
+```bash
+make test
+```
+
+Run a specific test file:
+```bash
+make test-file FILE=tests/config_spec.lua
+```
+
+### Test Coverage
+
+- `tests/config_spec.lua` - Configuration module tests
+  - Default status symbols and highlights
+  - Custom configuration merging
+  - Partial overrides
+  - Backwards compatibility
+
+- `tests/file_list_spec.lua` - File list status icon tests
+  - Default status icon behavior
+  - Custom symbols (brackets, longer text)
+  - Custom highlight groups
+  - Fallback behavior
+
+### Setup
+
+The first time you run tests, plenary.nvim will be automatically cloned to `/tmp/plenary.nvim`. To clean up:
+```bash
+make clean-test
+```
+
+### Writing New Tests
+
+Test files should be placed in `tests/` and follow the naming convention `*_spec.lua`. Use plenary's `describe` and `it` blocks:
+
+```lua
+local my_module = require("diff-review.my_module")
+
+describe("my_module", function()
+  it("should do something", function()
+    assert.equals("expected", my_module.do_something())
+  end)
+end)
+```
