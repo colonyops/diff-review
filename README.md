@@ -120,6 +120,8 @@ require('diff-review').setup({
   ui = {
     border = "rounded",
     show_icons = true,
+    comment_line_bg = nil, -- Override comment line background (e.g., "#2f3b45")
+    comment_line_hl = nil, -- Link comment line highlight to another group
     colors = {
       added = "DiffAdd",
       removed = "DiffDelete",

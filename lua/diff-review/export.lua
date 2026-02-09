@@ -24,13 +24,19 @@ local function format_comment_line(comment)
 end
 
 -- Extract code lines from diff output for a specific line or range
-local function get_code_context(file, start_line, end_line, context_lines)
+local function get_code_context(file, start_line, end_line, context_lines, diff_output)
 	context_lines = context_lines or 2
 	end_line = end_line or start_line
 
+	if not start_line or start_line < 1 then
+		return nil
+	end
+
 	-- Get diff output for the file
-	local diff = require("diff-review.diff")
-	local diff_output = diff.get_file_diff({ path = file })
+	if not diff_output then
+		local diff = require("diff-review.diff")
+		diff_output = diff.get_file_diff({ path = file })
+	end
 
 	if not diff_output or diff_output == "" then
 		return nil
@@ -43,7 +49,7 @@ local function get_code_context(file, start_line, end_line, context_lines)
 
 	for line in diff_output:gmatch("[^\r\n]+") do
 		-- Check for hunk header: @@ -start,count +start,count @@
-		local new_start = line:match("^@@ %-(%d+),?%d* %+(%d+),?%d* @@")
+		local _, new_start = line:match("^@@ %-(%d+),?%d* %+(%d+),?%d* @@")
 		if new_start then
 			current_line = tonumber(new_start) - 1
 			in_hunk = true
@@ -76,6 +82,42 @@ local function get_code_context(file, start_line, end_line, context_lines)
 	end
 
 	return extracted
+end
+
+local function build_diff_line_map(diff_output)
+	if not diff_output or diff_output == "" then
+		return {}
+	end
+
+	local line_map = {}
+	local idx = 0
+	local old_line = nil
+	local new_line = nil
+
+	for line in diff_output:gmatch("[^\r\n]+") do
+		idx = idx + 1
+
+		local old_start, new_start = line:match("^@@ %-(%d+),?%d* %+(%d+),?%d* @@")
+		if old_start and new_start then
+			old_line = tonumber(old_start)
+			new_line = tonumber(new_start)
+		elseif old_line and new_line then
+			local prefix = line:sub(1, 1)
+			if prefix == "+" then
+				line_map[idx] = new_line
+				new_line = new_line + 1
+			elseif prefix == "-" then
+				line_map[idx] = nil
+				old_line = old_line + 1
+			elseif prefix == " " then
+				line_map[idx] = new_line
+				old_line = old_line + 1
+				new_line = new_line + 1
+			end
+		end
+	end
+
+	return line_map
 end
 
 -- Format review metadata header
@@ -203,6 +245,10 @@ function M.export_full()
 		table.insert(lines, string.format("**File:** %s", file))
 		table.insert(lines, "")
 
+		local diff = require("diff-review.diff")
+		local diff_output = diff.get_file_diff({ path = file })
+		local line_map = build_diff_line_map(diff_output)
+
 		-- Sort comments by line number
 		table.sort(by_file[file], function(a, b)
 			return a.line < b.line
@@ -211,18 +257,41 @@ function M.export_full()
 		for _, comment in ipairs(by_file[file]) do
 			-- Add line reference
 			local start_line, end_line
+			local mapped_start, mapped_end
 			if comment.type == "range" then
 				start_line = comment.line_range.start
 				end_line = comment.line_range["end"]
-				table.insert(lines, string.format("Lines %d-%d:", start_line, end_line))
+				mapped_start = line_map[start_line]
+				mapped_end = line_map[end_line]
+				local display_start, display_end
+				if mapped_start and mapped_end then
+					display_start = mapped_start
+					display_end = mapped_end
+				else
+					display_start = start_line
+					display_end = end_line
+				end
+				table.insert(lines, string.format("Lines %d-%d:", display_start, display_end))
 			else
 				start_line = comment.line
 				end_line = comment.line
-				table.insert(lines, string.format("Line %d:", comment.line))
+				mapped_start = line_map[start_line]
+				local display_line = mapped_start or start_line
+				table.insert(lines, string.format("Line %d:", display_line))
 			end
 
 			-- Add code context
-			local context = get_code_context(file, start_line, end_line, 2)
+			local context
+			if comment.type == "range" then
+				if mapped_start and mapped_end then
+					context = get_code_context(file, mapped_start, mapped_end, 2, diff_output)
+				end
+			else
+				if mapped_start then
+					context = get_code_context(file, mapped_start, mapped_start, 2, diff_output)
+				end
+			end
+
 			if context and #context > 0 then
 				-- Determine file extension for syntax highlighting
 				local ext = file:match("%.([^%.]+)$") or ""
@@ -303,18 +372,11 @@ function M.export_annotated_diff()
 			end)
 
 			-- Parse diff and insert comments
-			local current_line = 0
 			local comment_idx = 1
+			local diff_line_idx = 0
 
 			for line in diff_output:gmatch("[^\r\n]+") do
-				-- Check for hunk header to track line numbers
-				local new_start = line:match("^@@ %-(%d+),?%d* %+(%d+),?%d* @@")
-				if new_start then
-					current_line = tonumber(new_start) - 1
-				elseif line:sub(1, 1) == "+" or line:sub(1, 1) == " " then
-					-- Track line number for added or context lines
-					current_line = current_line + 1
-				end
+				diff_line_idx = diff_line_idx + 1
 
 				-- Add the diff line
 				table.insert(output_lines, line)
@@ -324,7 +386,7 @@ function M.export_annotated_diff()
 					local comment = file_comments[comment_idx]
 					local comment_line = comment.type == "range" and comment.line_range.start or comment.line
 
-					if current_line == comment_line then
+					if diff_line_idx == comment_line then
 						-- Insert comment as a special annotation line
 						table.insert(output_lines, string.format("+    // 💬 %s", comment.text))
 						comment_idx = comment_idx + 1
