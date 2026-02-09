@@ -16,6 +16,16 @@ function M.parse_args(args)
   -- Trim whitespace
   args = args:match("^%s*(.-)%s*$")
 
+  -- After trimming, check if empty
+  if args == "" then
+    return {
+      type = "uncommitted",
+      base = nil,
+      head = nil,
+      pr_number = nil,
+    }
+  end
+
   -- Check for PR syntax: ghpr:N or pr:N
   local pr_number = args:match("^ghpr:(%d+)$") or args:match("^pr:(%d+)$")
   if pr_number then
@@ -28,8 +38,9 @@ function M.parse_args(args)
   end
 
   -- Check for range syntax: base..head or base...head
-  local base, head = args:match("^(.+)%.%.%.?(.+)$")
-  if base and head then
+  -- Match exactly two or three dots with non-greedy capture
+  local base, head = args:match("^(.-)%.%.%.?(.+)$")
+  if base and head and base ~= "" then
     return {
       type = "range",
       base = base,
