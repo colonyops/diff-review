@@ -107,9 +107,9 @@ local function format_note_text(note)
   -- Add line range header
   local line_info
   if note.type == "range" and note.line_range then
-    line_info = string.format("  L%d-L%d", note.line_range.start, note.line_range["end"])
+    line_info = string.format("  L%d-L%d", note.line_range.start, note.line_range["end"])
   else
-    line_info = string.format("  L%d", note.line)
+    line_info = string.format("  L%d", note.line)
   end
   table.insert(formatted, line_info)
 

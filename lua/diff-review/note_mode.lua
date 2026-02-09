@@ -30,6 +30,12 @@ notes.set_auto_save_hook(auto_save)
 
 -- Save session state to global file
 local function save_session()
+  -- Save notes for current set before saving session state
+  if M.state.is_active and M.state.current_set then
+    local set_notes = notes.get_for_set(M.state.current_set)
+    note_persistence.save(set_notes, M.state.current_set)
+  end
+
   note_persistence.save_global_session({
     is_active = M.state.is_active,
     current_set = M.state.current_set,
@@ -158,6 +164,10 @@ function M.exit()
     vim.notify("Note mode not active", vim.log.levels.INFO)
     return
   end
+
+  -- Save notes before exiting
+  local set_notes = notes.get_for_set(M.state.current_set)
+  note_persistence.save(set_notes, M.state.current_set)
 
   M.state.is_active = false
 
