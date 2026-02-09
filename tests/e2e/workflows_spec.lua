@@ -176,7 +176,7 @@ describe("diff-review workflows", function()
     end)
 
     it("should sanitize special characters in review IDs", function()
-      local review = reviews.create("ref", "feature/test-branch", "HEAD")
+      local review = reviews.create("ref", nil, "feature/test-branch")
 
       -- Should have sanitized the slash to underscore
       assert.is_not_nil(review.id:match("ref%-feature_test%-branch"))
