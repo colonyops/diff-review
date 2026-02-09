@@ -10,14 +10,40 @@ M.state = {
   initial_text = nil,
 }
 
+-- Calculate appropriate window height based on content
+local function calculate_window_height(buf)
+  local opts = config.get()
+  local comment_config = opts.ui.comment_window
+
+  if not comment_config.dynamic_resize then
+    return comment_config.initial_height
+  end
+
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then
+    return comment_config.initial_height
+  end
+
+  -- Get line count
+  local line_count = vim.api.nvim_buf_line_count(buf)
+
+  -- Calculate based on content, respecting min and max
+  local height = math.max(comment_config.initial_height, line_count)
+  height = math.min(height, comment_config.max_height)
+
+  return height
+end
+
 -- Calculate popup dimensions
-local function get_popup_config()
+local function get_popup_config(buf)
+  local opts = config.get()
   local width = math.floor(vim.o.columns * 0.6)
-  local height = math.floor(vim.o.lines * 0.4)
+  local height = buf and calculate_window_height(buf) or opts.ui.comment_window.initial_height
 
   -- Minimum dimensions
   if width < 40 then width = 40 end
-  if height < 10 then height = 10 end
+  if height < opts.ui.comment_window.initial_height then
+    height = opts.ui.comment_window.initial_height
+  end
 
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
@@ -29,10 +55,28 @@ local function get_popup_config()
     row = row,
     col = col,
     style = "minimal",
-    border = config.get().ui.border,
+    border = opts.ui.border,
     title = " Add Comment ",
     title_pos = "center",
   }
+end
+
+-- Resize window based on content
+local function resize_window()
+  if not M.state.win or not vim.api.nvim_win_is_valid(M.state.win) then
+    return
+  end
+  if not M.state.buf or not vim.api.nvim_buf_is_valid(M.state.buf) then
+    return
+  end
+
+  local new_height = calculate_window_height(M.state.buf)
+  local current_config = vim.api.nvim_win_get_config(M.state.win)
+
+  if current_config.height ~= new_height then
+    local new_config = get_popup_config(M.state.buf)
+    vim.api.nvim_win_set_config(M.state.win, new_config)
+  end
 end
 
 -- Close the popup
@@ -163,7 +207,7 @@ function M.open(initial_text, callback)
   end
 
   -- Create window
-  local win_config = get_popup_config()
+  local win_config = get_popup_config(M.state.buf)
   M.state.win = vim.api.nvim_open_win(M.state.buf, true, win_config)
 
   -- Set window options
@@ -172,6 +216,18 @@ function M.open(initial_text, callback)
 
   -- Setup keymaps
   setup_keymaps(M.state.buf)
+
+  -- Setup dynamic resizing if enabled
+  local opts = config.get()
+  if opts.ui.comment_window.dynamic_resize then
+    vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+      buffer = M.state.buf,
+      callback = resize_window,
+    })
+
+    -- Initial resize
+    resize_window()
+  end
 
   -- Position cursor at the beginning
   vim.api.nvim_win_set_cursor(M.state.win, { 1, 0 })

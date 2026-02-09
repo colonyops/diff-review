@@ -54,19 +54,140 @@ local function get_repo_root_name()
   return vim.fn.fnamemodify(root, ":t")
 end
 
+local function get_stats_header_lines()
+  local opts = config.get()
+  if not opts.ui.show_stats_header then
+    return {}
+  end
+
+  -- Get review info
+  local reviews = require("diff-review.reviews")
+  local review = reviews.get_current()
+  if not review then
+    return {}
+  end
+
+  -- Get file and comment counts
+  local file_count = #M.state.files
+  local comments = require("diff-review.comments")
+  local comment_stats = comments.stats()
+  local comment_count = comment_stats.total
+
+  -- Calculate aggregate line stats
+  local total_additions = 0
+  local total_deletions = 0
+  local total_modified = 0
+  local total_added = 0
+  local total_deleted = 0
+
+  if M.state.cached_file_stats then
+    for path, stats in pairs(M.state.cached_file_stats) do
+      total_additions = total_additions + (stats.additions or 0)
+      total_deletions = total_deletions + (stats.deletions or 0)
+    end
+  end
+
+  -- Count file statuses
+  for _, file in ipairs(M.state.files) do
+    if file.status == "M" then
+      total_modified = total_modified + 1
+    elseif file.status == "A" then
+      total_added = total_added + 1
+    elseif file.status == "D" then
+      total_deleted = total_deleted + 1
+    end
+  end
+
+  -- Format review type
+  local review_type = review.type
+  if review_type == "pr" then
+    review_type = string.format("PR #%d", review.pr_number)
+  elseif review_type == "ref" then
+    review_type = string.format("%s..HEAD", review.base)
+  elseif review_type == "range" then
+    review_type = string.format("%s..%s", review.base, review.head)
+  end
+
+  -- Build stats line using format template
+  local format_str = opts.ui.stats_header.format
+  local stats_line = format_str
+    :gsub("{modified}", tostring(total_modified))
+    :gsub("{added}", tostring(total_added))
+    :gsub("{deleted}", tostring(total_deleted))
+    :gsub("{files}", tostring(file_count))
+    :gsub("{additions}", tostring(total_additions))
+    :gsub("{deletions}", tostring(total_deletions))
+    :gsub("{comments}", tostring(comment_count))
+
+  return {
+    string.format("  Review: %s", review_type),
+    string.format("  Files: %d | Lines: +%d -%d | Comments: %d",
+      file_count, total_additions, total_deletions, comment_count),
+    string.format("  %s", stats_line),
+    opts.ui.stats_header.separator,
+  }
+end
+
 local function get_header_lines()
   local opts = config.get()
-  return {
-    string.format(
-      "  Keys: %s add, %s edit, %s delete, %s list, %s all",
-      opts.keymaps.add_comment,
-      opts.keymaps.edit_comment,
-      opts.keymaps.delete_comment,
-      opts.keymaps.list_comments,
-      opts.keymaps.view_all_comments
-    ),
-    "",
-  }
+  local lines = {}
+
+  -- Add stats header if enabled
+  local stats_lines = get_stats_header_lines()
+  for _, line in ipairs(stats_lines) do
+    table.insert(lines, line)
+  end
+
+  -- Add keymaps header
+  table.insert(lines, string.format(
+    "  Keys: %s add, %s edit, %s delete, %s list, %s all",
+    opts.keymaps.add_comment,
+    opts.keymaps.edit_comment,
+    opts.keymaps.delete_comment,
+    opts.keymaps.list_comments,
+    opts.keymaps.view_all_comments
+  ))
+  table.insert(lines, "")
+
+  return lines
+end
+
+local function apply_stats_header_highlights(highlights, lines)
+  local opts = config.get()
+  if not opts.ui.show_stats_header then
+    return
+  end
+
+  -- Find lines with +/- numbers in the first few header lines
+  for i = 1, math.min(5, #lines) do
+    local line = lines[i]
+    local line_idx = i - 1  -- 0-indexed
+
+    -- Highlight additions (+numbers)
+    for pos in line:gmatch("()%+%d+") do
+      local start_col = pos - 1
+      local end_col = line:match("%+(%d+)", pos) and start_col + 1 + #line:match("%+(%d+)", pos) or start_col + 2
+      table.insert(highlights, {
+        line = line_idx,
+        col = start_col,
+        end_col = end_col,
+        hl_group = "DiffAdd",
+      })
+    end
+
+    -- Highlight deletions (-numbers)
+    for pos in line:gmatch("()%-(%d+)") do
+      local start_col = pos - 1
+      local num = line:match("%-(%d+)", pos)
+      local end_col = num and start_col + 1 + #num or start_col + 2
+      table.insert(highlights, {
+        line = line_idx,
+        col = start_col,
+        end_col = end_col,
+        hl_group = "DiffDelete",
+      })
+    end
+  end
 end
 
 -- Get file icon and color from devicons
@@ -472,6 +593,9 @@ function M.render()
   -- Set lines
   vim.api.nvim_buf_set_lines(state.file_list_buf, 0, -1, false, lines)
 
+  -- Apply stats header highlights
+  apply_stats_header_highlights(highlights, lines)
+
   -- Apply highlights
   local ns_id = vim.api.nvim_create_namespace("diff_review_file_list")
   vim.api.nvim_buf_clear_namespace(state.file_list_buf, ns_id, 0, -1)
@@ -652,6 +776,17 @@ function M.select_file()
   end
 
   M.update_diff()
+
+  -- Auto-focus diff window if configured
+  local config = require("diff-review.config").get()
+  if config.file_list.focus_diff_on_select then
+    local layout = require("diff-review.layout")
+    local state = layout.get_state()
+
+    if state.diff_win and vim.api.nvim_win_is_valid(state.diff_win) then
+      vim.api.nvim_set_current_win(state.diff_win)
+    end
+  end
 end
 
 -- Update diff panel with current file
