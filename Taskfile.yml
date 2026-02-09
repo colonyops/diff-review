@@ -1,0 +1,50 @@
+version: '3'
+
+tasks:
+  install-plenary:
+    desc: Install plenary.nvim (required for tests)
+    silent: false
+    cmds:
+      - |
+        if [ ! -d ~/.local/share/nvim/site/pack/vendor/start/plenary.nvim ]; then
+          echo "Installing plenary.nvim..."
+          mkdir -p ~/.local/share/nvim/site/pack/vendor/start
+          git clone --depth=1 https://github.com/nvim-lua/plenary.nvim \
+            ~/.local/share/nvim/site/pack/vendor/start/plenary.nvim
+          echo "plenary.nvim installed successfully"
+        else
+          echo "plenary.nvim already installed"
+        fi
+
+  test:
+    desc: Run all tests
+    deps: [install-plenary]
+    cmds:
+      - echo "Running all tests..."
+      - >
+        nvim --headless -u tests/minimal_init.lua
+        -c "lua require('plenary.test_harness').test_directory('tests/', { minimal_init = 'tests/minimal_init.lua' })"
+
+  test-file:
+    desc: "Run a specific test file (usage: task test-file FILE=tests/parser_spec.lua)"
+    deps: [install-plenary]
+    cmds:
+      - |
+        if [ -z "{{.FILE}}" ]; then
+          echo "Error: FILE parameter required. Usage: task test-file FILE=tests/parser_spec.lua"
+          exit 1
+        fi
+      - echo "Running test file{{":"}} {{.FILE}}"
+      - nvim --headless -u tests/minimal_init.lua -c "lua require('plenary.busted').run('{{.FILE}}')"
+
+  test-watch:
+    desc: Watch tests and run on change (requires entr)
+    deps: [install-plenary]
+    cmds:
+      - |
+        if ! command -v entr > /dev/null; then
+          echo "Error: entr not found. Install with: brew install entr (macOS) or apt-get install entr (Linux)"
+          exit 1
+        fi
+      - echo "Watching for changes in lua/ and tests/..."
+      - find lua tests -name "*.lua" | entr -c task test

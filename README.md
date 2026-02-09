@@ -303,6 +303,26 @@ vim.opt.runtimepath:append("~/path/to/diff-review.nvim")
 require('diff-review').setup()
 ```
 
+### Running Tests
+
+The project uses [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) for testing:
+
+```bash
+# Install plenary.nvim (if not already installed)
+task install-plenary
+
+# Run all tests
+task test
+
+# Run a specific test file
+task test-file FILE=tests/parser_spec.lua
+
+# Watch mode (requires entr)
+task test-watch
+```
+
+See [TESTING.md](TESTING.md) for manual testing instructions.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests.
