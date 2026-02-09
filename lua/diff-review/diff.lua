@@ -428,29 +428,27 @@ local function parse_diff_with_syntax(diff_output)
   return lines, line_types
 end
 
--- Apply diff signs to show add/delete indicators
-local function apply_diff_signs(buf, line_types)
-  local sign_ns = "diff_review_signs"
+-- Apply diff line highlighting to show add/delete with background colors
+local function apply_diff_highlights(buf, line_types)
+  local ns_id = vim.api.nvim_create_namespace("diff_review_highlights")
 
-  -- Define signs if not already defined
-  pcall(vim.fn.sign_define, "DiffReviewAdd", {
-    text = "+",
-    texthl = "DiffAdd",
-  })
-  pcall(vim.fn.sign_define, "DiffReviewDelete", {
-    text = "-",
-    texthl = "DiffDelete",
-  })
+  -- Clear existing highlights
+  vim.api.nvim_buf_clear_namespace(buf, ns_id, 0, -1)
 
-  -- Clear existing signs
-  vim.fn.sign_unplace(sign_ns, { buffer = buf })
-
-  -- Place signs for each line
+  -- Apply line highlights for each line
   for i, line_type in ipairs(line_types) do
     if line_type == "add" then
-      vim.fn.sign_place(0, sign_ns, "DiffReviewAdd", buf, { lnum = i, priority = 10 })
+      -- Green background for added lines
+      vim.api.nvim_buf_set_extmark(buf, ns_id, i - 1, 0, {
+        line_hl_group = "DiffAdd",
+        priority = 100,
+      })
     elseif line_type == "delete" then
-      vim.fn.sign_place(0, sign_ns, "DiffReviewDelete", buf, { lnum = i, priority = 10 })
+      -- Red background for deleted lines
+      vim.api.nvim_buf_set_extmark(buf, ns_id, i - 1, 0, {
+        line_hl_group = "DiffDelete",
+        priority = 100,
+      })
     end
   end
 end
@@ -548,8 +546,8 @@ function M.show_file_diff(file)
       vim.api.nvim_buf_set_option(state.diff_buf, "filetype", filetype)
     end
 
-    -- Apply diff signs to show add/delete indicators
-    apply_diff_signs(state.diff_buf, line_types)
+    -- Apply diff line highlights to show add/delete indicators
+    apply_diff_highlights(state.diff_buf, line_types)
   else
     -- Fallback to diff filetype
     vim.api.nvim_buf_set_option(state.diff_buf, "filetype", "diff")
