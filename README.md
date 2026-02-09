@@ -79,29 +79,22 @@ require('diff-review').setup()
 
 ### Commands
 
-Open the diff review window:
+**Main diff review command:**
 ```vim
-:DiffReview
+:DiffReview              " Open with prompt to select type
+:DiffReview origin/main  " Review against branch
+:DiffReview pr:123       " Review pull request
+:DiffReview close        " Close review
+:DiffReview toggle       " Toggle visibility
+:DiffReview list         " List/switch reviews
+:DiffReview copy [mode]  " Copy to clipboard (comments/full/diff)
+:DiffReview submit       " Submit to GitHub
+:DiffReview health       " Health check
 ```
 
-Review changes against a specific branch:
+**Shortcut for toggling** (most common operation):
 ```vim
-:DiffReview origin/main
-```
-
-Review a pull request (requires gh CLI):
-```vim
-:DiffReviewPR 123
-```
-
-Submit PR review comments (PR reviews only):
-```vim
-:DiffReviewSubmit
-```
-
-Toggle diff review window (preserves state):
-```vim
-:DiffReviewToggle
+:DiffReviewToggle        " Quick toggle (preserves state)
 ```
 
 ### Navigating to Files
@@ -428,10 +421,10 @@ Comments are stored locally in `.diff-review/` directory and persist across sess
 
 ### Pull Request Reviews
 
-When reviewing a PR (via `:DiffReviewPR`), you can submit comments directly to GitHub:
+When reviewing a PR (via `:DiffReview pr:123`), you can submit comments directly to GitHub:
 
 ```vim
-:DiffReviewSubmit
+:DiffReview submit
 ```
 
 This requires the [GitHub CLI](https://cli.github.com/) to be installed and authenticated.
@@ -450,50 +443,27 @@ Note mode allows you to add comments to any files in your codebase without requi
 
 ### Commands
 
-Enter note mode with the default set:
+**All note mode operations:**
 ```vim
-:DiffReviewNoteEnter
+:DiffNote enter [set]    " Enter note mode (default set if not specified)
+:DiffNote exit           " Exit note mode
+:DiffNote toggle [set]   " Toggle note mode
+:DiffNote clear          " Clear all notes in current set
+:DiffNote list           " List and switch between sets
+:DiffNote switch <set>   " Switch to a different set
+:DiffNote copy [mode]    " Copy to clipboard (notes/full)
 ```
 
-Enter note mode with a named set:
+**Examples:**
 ```vim
-:DiffReviewNoteEnter security-audit
-```
-
-Exit note mode:
-```vim
-:DiffReviewNoteExit
-```
-
-Toggle note mode:
-```vim
-:DiffReviewNoteToggle
-```
-
-Clear all notes in current set:
-```vim
-:DiffReviewNoteClear
-```
-
-List and switch between note sets:
-```vim
-:DiffReviewNoteList
-```
-
-Switch to a different note set:
-```vim
-:DiffReviewNoteSwitch refactoring
-```
-
-Copy notes to clipboard (markdown format):
-```vim
-:DiffReviewNoteCopy         " Copy notes with line numbers
-:DiffReviewNoteCopy full    " Copy notes with code context
+:DiffNote enter security-audit    " Start security audit notes
+:DiffNote toggle                  " Quick toggle
+:DiffNote copy full               " Export with code context
 ```
 
 ### Usage
 
-1. **Enter note mode** with `:DiffReviewNoteEnter [set_name]`
+1. **Enter note mode** with `:DiffNote enter [set_name]`
 2. **Navigate files normally** (`:edit`, buffer switches, etc.)
 3. **Add comments** using the same keymaps as diff review:
    - `<leader>c` - Add comment at cursor (or range in visual mode)
@@ -502,7 +472,7 @@ Copy notes to clipboard (markdown format):
    - `<leader>l` - List comments for current file
    - `<leader>v` - View all comments (across all files)
 4. **Comments auto-save** on each change
-5. **Exit mode** with `:DiffReviewNoteExit` or toggle with `:DiffReviewNoteToggle`
+5. **Exit mode** with `:DiffNote exit` or toggle with `:DiffNote toggle`
 
 ### Storage
 
@@ -532,22 +502,22 @@ require('diff-review').setup({
 
 **Code audit:**
 ```vim
-:DiffReviewNoteEnter security-audit
+:DiffNote enter security-audit
 " Navigate files and add notes about security concerns
 " Notes persist across sessions
 ```
 
 **Refactoring plan:**
 ```vim
-:DiffReviewNoteEnter refactoring
+:DiffNote enter refactoring
 " Document areas that need refactoring
 " Switch between note sets as needed
-:DiffReviewNoteSwitch technical-debt
+:DiffNote switch technical-debt
 ```
 
 **Learning codebase:**
 ```vim
-:DiffReviewNoteEnter learning
+:DiffNote enter learning
 " Add notes about how things work
 " View all notes: <leader>v
 ```
@@ -558,7 +528,7 @@ Copy all notes to clipboard in markdown format:
 
 **Notes only (with line numbers):**
 ```vim
-:DiffReviewNoteCopy
+:DiffNote copy
 ```
 
 Output format:
@@ -586,7 +556,7 @@ Output format:
 
 **Full export (with code context):**
 ```vim
-:DiffReviewNoteCopy full
+:DiffNote copy full
 ```
 
 Includes 2 lines of code context before/after each note with syntax highlighting.
@@ -601,14 +571,11 @@ Note mode and diff review mode can run simultaneously:
 
 ## Exporting Comments
 
-Export all comments to markdown:
+Export all review comments to markdown:
 ```vim
-:DiffReviewExport
-```
-
-Export with annotated diff:
-```vim
-:DiffReviewExport annotated
+:DiffReview copy           " Comments with line numbers
+:DiffReview copy full      " Comments with code context
+:DiffReview copy diff      " Annotated diff format
 ```
 
 ## Troubleshooting
