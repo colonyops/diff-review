@@ -111,12 +111,12 @@ local function get_stats_header_lines()
   -- Build compact single-line stats
   local file_parts = {}
   if total_modified > 0 then table.insert(file_parts, string.format("%dM", total_modified)) end
-  if total_added > 0 then table.insert(file_parts, string.format("%dA", total_added)) end
   if total_deleted > 0 then table.insert(file_parts, string.format("%dD", total_deleted)) end
+  if total_added > 0 then table.insert(file_parts, string.format("%dA", total_added)) end
   local file_str = table.concat(file_parts, " ")
 
-  local stats_line = string.format("  %s | Files: %s | Lines: +%d -%d | Comments: %d",
-    review_type, file_str, total_additions, total_deletions, comment_count)
+  local stats_line = string.format("  %s | 📄 %s | +%d -%d",
+    review_type, file_str, total_additions, total_deletions)
 
   return {
     stats_line,
