@@ -250,4 +250,106 @@ function M.view_all_comments()
   vim.notify(string.format("Found %d comment(s)", #all_comments), vim.log.levels.INFO)
 end
 
+-- Open file at cursor with optional split mode
+function M.open_file_at_cursor(split_mode)
+  local diff = require("diff-review.diff")
+  local file_list = require("diff-review.file_list")
+  local layout = require("diff-review.layout")
+  local state = layout.get_state()
+
+  -- Get current file
+  local files = file_list.state.files
+  local current_index = file_list.state.current_index
+
+  if #files == 0 or current_index < 1 or current_index > #files then
+    vim.notify("No file selected", vim.log.levels.WARN)
+    return
+  end
+
+  local file = files[current_index]
+
+  -- Get line mapping at cursor
+  local line_info = diff.get_file_line_at_cursor()
+
+  if not line_info then
+    vim.notify("Cannot determine file line at this position", vim.log.levels.WARN)
+    return
+  end
+
+  -- Handle deleted lines
+  if line_info.type == "delete" then
+    vim.notify("Cannot navigate to deleted line", vim.log.levels.INFO)
+    return
+  end
+
+  -- Handle header lines - use hunk start
+  if line_info.type == "header" then
+    if line_info.new_line then
+      line_info.file_line = line_info.new_line
+    else
+      vim.notify("Cannot navigate from metadata line", vim.log.levels.WARN)
+      return
+    end
+  end
+
+  -- Handle deleted files
+  if file.status == "D" then
+    vim.notify("Cannot open deleted file: " .. file.path, vim.log.levels.INFO)
+    return
+  end
+
+  -- Check if file exists
+  local filepath = file.path
+  if not vim.loop.fs_stat(filepath) then
+    if file.status == "A" then
+      vim.notify("New file not yet created: " .. filepath, vim.log.levels.ERROR)
+    else
+      vim.notify("File not found: " .. filepath, vim.log.levels.ERROR)
+    end
+    return
+  end
+
+  -- Store the original window to return to
+  local original_win = state.original_win
+
+  -- Close review UI
+  local ui = require("diff-review.ui")
+  ui.close()
+
+  -- Return to original window if valid
+  if original_win and vim.api.nvim_win_is_valid(original_win) then
+    vim.api.nvim_set_current_win(original_win)
+  end
+
+  -- Open file with appropriate split mode
+  if split_mode == "split" then
+    vim.cmd("split " .. vim.fn.fnameescape(filepath))
+  elseif split_mode == "vsplit" then
+    vim.cmd("vsplit " .. vim.fn.fnameescape(filepath))
+  else
+    vim.cmd("edit " .. vim.fn.fnameescape(filepath))
+  end
+
+  -- Jump to the mapped line and center
+  if line_info.file_line and line_info.file_line > 0 then
+    vim.api.nvim_win_set_cursor(0, { line_info.file_line, 0 })
+    vim.cmd("normal! zz")
+  end
+end
+
+-- Convenience function: open file in current window
+function M.open_file()
+  M.open_file_at_cursor(nil)
+end
+
+-- Convenience function: open file in horizontal split
+function M.open_file_split()
+  M.open_file_at_cursor("split")
+end
+
+-- Convenience function: open file in vertical split
+function M.open_file_vsplit()
+  M.open_file_at_cursor("vsplit")
+end
+
 return M

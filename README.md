@@ -99,6 +99,49 @@ Submit PR review comments (PR reviews only):
 :DiffReviewSubmit
 ```
 
+Toggle diff review window (preserves state):
+```vim
+:DiffReviewToggle
+```
+
+### Navigating to Files
+
+You can navigate directly from the diff view to the actual file in your editor:
+
+- `gf` - Open file at cursor position in current window
+- `<C-w>f` - Open file in horizontal split
+- `<C-w>gf` - Open file in vertical split
+
+Alternatively, use commands:
+```vim
+:DiffReviewOpenFile
+:DiffReviewOpenFileSplit
+:DiffReviewOpenFileVsplit
+```
+
+**Behavior:**
+- For added and context lines: Opens file at the corresponding line number
+- For deleted lines: Shows notification (cannot navigate to deleted content)
+- For hunk headers: Jumps to the start of the hunk
+- Closes the review window and returns focus to the original window
+
+### Toggle Review with State Preservation
+
+The `:DiffReviewToggle` command allows you to close and reopen the review while preserving your session state:
+
+```lua
+-- Map to a convenient key
+vim.keymap.set("n", "<leader>dr", ":DiffReviewToggle<CR>", { desc = "Toggle diff review" })
+```
+
+**Preserved state includes:**
+- Review context (PR number, branch comparison, uncommitted changes)
+- Selected file and position
+- Cursor and scroll position in diff view
+- View mode (tree or flat)
+
+State persists across Neovim restarts in `~/.local/share/nvim/diff-review/session_state.json` (respects `$XDG_DATA_HOME`).
+
 ### Keybindings (default)
 
 **File List Panel:**
@@ -114,6 +157,9 @@ Submit PR review comments (PR reviews only):
 **Diff Panel:**
 - `q` - Close window
 - Standard Neovim navigation (`j`, `k`, `gg`, `G`, etc.)
+- `gf` - Open file at cursor in current window
+- `<C-w>f` - Open file in horizontal split
+- `<C-w>gf` - Open file in vertical split
 - `<leader>c` - Add comment at cursor (normal) or for range (visual)
 - `<leader>e` - Edit comment at cursor
 - `<leader>d` - Delete comment at cursor
@@ -395,6 +441,82 @@ Export with annotated diff:
 ```vim
 :DiffReviewExport annotated
 ```
+
+## Troubleshooting
+
+### Layout fails to open or windows disappear
+
+If you see "Layout failed to open correctly" or the diff view doesn't appear, this is often caused by session restore plugins interfering with the layout creation.
+
+**Symptoms:**
+- Windows open briefly then disappear
+- "Layout failed to open" warning
+- More common when using `nvim -c "DiffReview ..."` from command line
+- May happen with other buffers/tabs already open
+
+**Solution for auto-session users:**
+
+Add this to the very top of your `init.lua` (before plugins load):
+
+```lua
+-- Disable auto-session when using -c commands
+for _, arg in ipairs(vim.v.argv) do
+  if arg == "-c" or arg == "+c" then
+    vim.g.auto_session_enabled = false
+    break
+  end
+end
+```
+
+Then update your auto-session config:
+
+```lua
+require("auto-session").setup({
+  -- Add DiffReview to bypass list
+  bypass_session_save_file_types = {
+    "", "blank", "alpha", "NvimTree", "nofile",
+    "Trouble", "dapui", "dap", "DiffReview"
+  },
+  -- Close diff-review before saving session
+  pre_save_cmds = {
+    "tabdo NvimTreeClose",
+    "silent! DiffReviewClose"
+  },
+})
+```
+
+And add conditional loading to the plugin spec:
+
+```lua
+{
+  "rmagatti/auto-session",
+  cond = function()
+    return vim.g.auto_session_enabled ~= false
+  end,
+  config = function()
+    -- your setup here
+  end,
+}
+```
+
+**Solution for other session plugins (persisted.nvim, possession, etc.):**
+
+Disable the plugin when starting with `-c` commands, or defer diff-review operations:
+
+```lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = "PersistedLoadPost", -- or your plugin's event
+  callback = function()
+    vim.defer_fn(function()
+      -- Safe to use diff-review now
+    end, 200)
+  end,
+})
+```
+
+**Health check:**
+
+Run `:DiffReviewHealth` to diagnose layout issues and detect session plugins.
 
 ## Development
 

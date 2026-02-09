@@ -95,6 +95,10 @@ M.setup = function(opts)
     require("diff-review.layout").close()
   end, { desc = "Close diff review window" })
 
+  vim.api.nvim_create_user_command("DiffReviewToggle", function()
+    require("diff-review.layout").toggle()
+  end, { desc = "Toggle diff review window (preserves state)" })
+
   vim.api.nvim_create_user_command("DiffReviewList", function()
     require("diff-review.picker").show()
   end, { desc = "List and switch between active reviews" })
@@ -143,6 +147,60 @@ M.setup = function(opts)
   vim.api.nvim_create_user_command("DiffReviewSubmit", function()
     require("diff-review.submit").submit_current_review()
   end, { desc = "Submit review comments to GitHub" })
+
+  vim.api.nvim_create_user_command("DiffReviewOpenFile", function()
+    require("diff-review.actions").open_file()
+  end, { desc = "Open file at cursor in current window" })
+
+  vim.api.nvim_create_user_command("DiffReviewOpenFileSplit", function()
+    require("diff-review.actions").open_file_split()
+  end, { desc = "Open file at cursor in horizontal split" })
+
+  vim.api.nvim_create_user_command("DiffReviewOpenFileVsplit", function()
+    require("diff-review.actions").open_file_vsplit()
+  end, { desc = "Open file at cursor in vertical split" })
+
+  vim.api.nvim_create_user_command("DiffReviewHealth", function()
+    local layout = require("diff-review.layout")
+    local state = layout.get_state()
+
+    local status = {
+      "Diff Review Health Check",
+      "========================",
+      "",
+      "Layout State:",
+      "  is_open: " .. tostring(state.is_open),
+      "  file_list_win valid: " .. tostring(state.file_list_win and vim.api.nvim_win_is_valid(state.file_list_win)),
+      "  diff_win valid: " .. tostring(state.diff_win and vim.api.nvim_win_is_valid(state.diff_win)),
+      "  file_list_buf valid: " .. tostring(state.file_list_buf and vim.api.nvim_buf_is_valid(state.file_list_buf)),
+      "  diff_buf valid: " .. tostring(state.diff_buf and vim.api.nvim_buf_is_valid(state.diff_buf)),
+      "",
+      "Environment:",
+      "  Current tab: " .. vim.api.nvim_get_current_tabpage(),
+      "  Total tabs: " .. vim.fn.tabpagenr("$"),
+      "  Total windows: " .. vim.fn.winnr("$"),
+      "  Current buffer: " .. vim.api.nvim_get_current_buf(),
+      "",
+    }
+
+    -- Check for session plugins
+    local session_plugins = {
+      "persisted",
+      "auto-session",
+      "possession",
+      "resession",
+    }
+
+    table.insert(status, "Detected Session Plugins:")
+    for _, plugin in ipairs(session_plugins) do
+      local ok = pcall(require, plugin)
+      if ok then
+        table.insert(status, "  ✓ " .. plugin)
+      end
+    end
+
+    vim.notify(table.concat(status, "\n"), vim.log.levels.INFO)
+  end, { desc = "Check diff-review health and diagnose issues" })
 end
 
 M.config = config

@@ -445,6 +445,7 @@ function M.render()
         if entry.index then
           M.state.current_index = entry.index
           M.state.initial_load = false
+          M.update_diff()
           break
         end
       end
