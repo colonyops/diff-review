@@ -40,8 +40,11 @@ M.setup = function(opts)
     local args = vim.split(opts.args or "", "%s+", { trimempty = true })
     local subcommand = args[1]
 
-    -- If no subcommand or looks like a ref, treat as open command
-    if not subcommand or subcommand:match("^[^a-z]") or subcommand:match("%.%.") or subcommand:match("^pr:") then
+    -- Known subcommands
+    local subcommands = { close = true, toggle = true, list = true, copy = true, submit = true, health = true }
+
+    -- If no subcommand or not a known subcommand, treat as open command with ref
+    if not subcommand or not subcommands[subcommand] then
       -- Open diff review with optional ref
       local parser = require("diff-review.parser")
       local function open_parsed(parsed)
