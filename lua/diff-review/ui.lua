@@ -94,8 +94,49 @@ function M.clear_comments(buf)
   vim.fn.sign_unplace(M.sign_group, { buffer = buf })
 end
 
+-- Wrap a line of text at the specified width, preserving indentation
+local function wrap_line(line, max_width, indent)
+  if #line <= max_width then
+    return { line }
+  end
+
+  local wrapped = {}
+  local current = line
+
+  while #current > max_width do
+    -- Find the last space before max_width
+    local wrap_pos = max_width
+    for i = max_width, 1, -1 do
+      if current:sub(i, i):match("%s") then
+        wrap_pos = i
+        break
+      end
+    end
+
+    -- If no space found, hard break at max_width
+    if wrap_pos == max_width and not current:sub(wrap_pos, wrap_pos):match("%s") then
+      wrap_pos = max_width
+    end
+
+    -- Add the wrapped line
+    table.insert(wrapped, current:sub(1, wrap_pos):match("^(.-)%s*$"))
+
+    -- Continue with remainder, adding indent
+    current = indent .. current:sub(wrap_pos + 1):match("^%s*(.*)$")
+  end
+
+  -- Add remaining text
+  if #current > 0 then
+    table.insert(wrapped, current)
+  end
+
+  return wrapped
+end
+
 -- Format comment text for display
 local function format_comment_text(comment)
+  local opts = config.get()
+  local max_width = opts.ui.text_wrap_width or 80
   local lines = vim.split(comment.text, "\n")
   local formatted = {}
 
@@ -108,9 +149,13 @@ local function format_comment_text(comment)
   end
   table.insert(formatted, line_info)
 
-  -- Add comment text lines with indentation
+  -- Add comment text lines with indentation and wrapping
   for _, line in ipairs(lines) do
-    table.insert(formatted, "   " .. line)
+    local prefixed_line = "   " .. line
+    local wrapped = wrap_line(prefixed_line, max_width, "   ")
+    for _, wrapped_line in ipairs(wrapped) do
+      table.insert(formatted, wrapped_line)
+    end
   end
 
   return formatted

@@ -51,6 +51,7 @@ M.defaults = {
     stats_header = {
       separator = " | ",   -- Separator between stats and file list
     },
+    text_wrap_width = 80,  -- Maximum width for comment text before wrapping
     comment_window = {
       initial_height = 10,  -- Starting height of comment window
       max_height = 30,      -- Maximum height for comment window
