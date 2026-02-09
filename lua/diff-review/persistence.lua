@@ -139,4 +139,100 @@ function M.get_storage_dir()
   return get_storage_dir()
 end
 
+-- Get global storage directory (per-user, not per-repo)
+local function get_global_storage_dir()
+  local data_home = os.getenv("XDG_DATA_HOME")
+  if not data_home or data_home == "" then
+    data_home = vim.fn.expand("~/.local/share")
+  end
+  return data_home .. "/nvim/diff-review"
+end
+
+-- Ensure global storage directory exists
+local function ensure_global_storage_dir()
+  local dir = get_global_storage_dir()
+  if vim.fn.isdirectory(dir) == 0 then
+    vim.fn.mkdir(dir, "p")
+  end
+  return dir
+end
+
+-- Get global session file path
+local function get_global_session_path()
+  local dir = ensure_global_storage_dir()
+  return dir .. "/session_state.json"
+end
+
+-- Save global session state
+function M.save_global_session(state)
+  local path = get_global_session_path()
+
+  -- Prepare data with version and timestamp
+  local data = {
+    version = 1,
+    saved_at = os.time(),
+    state = state,
+  }
+
+  local json = vim.fn.json_encode(data)
+
+  -- Write to file with error handling
+  local file, err = io.open(path, "w")
+  if not file then
+    vim.notify("Failed to save session: " .. (err or "unknown error"), vim.log.levels.ERROR)
+    return false
+  end
+
+  file:write(json)
+  file:close()
+
+  return true
+end
+
+-- Load global session state
+function M.load_global_session()
+  local path = get_global_session_path()
+
+  -- Check if file exists
+  if vim.fn.filereadable(path) == 0 then
+    return nil
+  end
+
+  -- Read file
+  local file, err = io.open(path, "r")
+  if not file then
+    vim.notify("Failed to load session: " .. (err or "unknown error"), vim.log.levels.WARN)
+    return nil
+  end
+
+  local content = file:read("*a")
+  file:close()
+
+  -- Handle empty file
+  if not content or content == "" then
+    return nil
+  end
+
+  -- Parse JSON with error handling
+  local ok, data = pcall(vim.fn.json_decode, content)
+  if not ok or not data or type(data) ~= "table" then
+    vim.notify("Corrupted session file, ignoring", vim.log.levels.WARN)
+    return nil
+  end
+
+  return data.state
+end
+
+-- Clear global session state
+function M.clear_global_session()
+  local path = get_global_session_path()
+
+  if vim.fn.filereadable(path) == 1 then
+    vim.fn.delete(path)
+    return true
+  end
+
+  return false
+end
+
 return M
