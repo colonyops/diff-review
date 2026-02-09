@@ -262,6 +262,12 @@ require('diff-review').setup({
   persistence = {
     auto_save = true, -- Auto-save comments after each change
   },
+
+  -- Note mode options
+  notes = {
+    default_set = "default", -- Default note set name
+    auto_restore = true, -- Auto-restore note mode on startup
+  },
 })
 ```
 
@@ -429,6 +435,124 @@ When reviewing a PR (via `:DiffReviewPR`), you can submit comments directly to G
 ```
 
 This requires the [GitHub CLI](https://cli.github.com/) to be installed and authenticated.
+
+## Note Mode
+
+Note mode allows you to add comments to any files in your codebase without requiring diff or review context. Perfect for code audits, documentation, learning notes, or refactoring plans.
+
+### Features
+
+- **Works anywhere**: Comment on any file during normal editing, no special layout required
+- **Multiple note sets**: Organize notes for different purposes (e.g., "security-audit", "refactoring")
+- **Persistent**: Notes auto-save and persist across Neovim sessions
+- **Session restore**: Automatically restores note mode on startup (configurable)
+- **Same UI**: Reuses diff review keymaps and styling for consistency
+
+### Commands
+
+Enter note mode with the default set:
+```vim
+:DiffReviewNoteEnter
+```
+
+Enter note mode with a named set:
+```vim
+:DiffReviewNoteEnter security-audit
+```
+
+Exit note mode:
+```vim
+:DiffReviewNoteExit
+```
+
+Toggle note mode:
+```vim
+:DiffReviewNoteToggle
+```
+
+Clear all notes in current set:
+```vim
+:DiffReviewNoteClear
+```
+
+List and switch between note sets:
+```vim
+:DiffReviewNoteList
+```
+
+Switch to a different note set:
+```vim
+:DiffReviewNoteSwitch refactoring
+```
+
+### Usage
+
+1. **Enter note mode** with `:DiffReviewNoteEnter [set_name]`
+2. **Navigate files normally** (`:edit`, buffer switches, etc.)
+3. **Add comments** using the same keymaps as diff review:
+   - `<leader>c` - Add comment at cursor (or range in visual mode)
+   - `<leader>e` - Edit comment at cursor
+   - `<leader>d` - Delete comment at cursor
+   - `<leader>l` - List comments for current file
+   - `<leader>v` - View all comments (across all files)
+4. **Comments auto-save** on each change
+5. **Exit mode** with `:DiffReviewNoteExit` or toggle with `:DiffReviewNoteToggle`
+
+### Storage
+
+Notes are stored in `.diff-review/notes/` directory:
+```
+.diff-review/
+├── notes/
+│   ├── default.json          # Default note set
+│   ├── security-audit.json   # Named set
+│   └── refactoring.json      # Another named set
+```
+
+### Configuration
+
+Configure note mode behavior in your setup:
+
+```lua
+require('diff-review').setup({
+  notes = {
+    default_set = "default",  -- Default note set name
+    auto_restore = true,      -- Auto-restore note mode on startup
+  },
+})
+```
+
+### Example Workflows
+
+**Code audit:**
+```vim
+:DiffReviewNoteEnter security-audit
+" Navigate files and add notes about security concerns
+" Notes persist across sessions
+```
+
+**Refactoring plan:**
+```vim
+:DiffReviewNoteEnter refactoring
+" Document areas that need refactoring
+" Switch between note sets as needed
+:DiffReviewNoteSwitch technical-debt
+```
+
+**Learning codebase:**
+```vim
+:DiffReviewNoteEnter learning
+" Add notes about how things work
+" View all notes: <leader>v
+```
+
+### Coexistence with Diff Review
+
+Note mode and diff review mode can run simultaneously:
+- Separate namespaces prevent conflicts
+- Separate storage directories
+- Both can be visible at the same time
+- No conversion between notes and review comments
 
 ## Exporting Comments
 
