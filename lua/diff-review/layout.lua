@@ -238,6 +238,11 @@ function M.setup_keymaps()
 
   -- Comment actions (visual mode)
   vim.keymap.set("v", opts.keymaps.add_comment, actions.add_comment_for_range, keymap_opts)
+
+  -- File navigation actions
+  vim.keymap.set("n", "gf", actions.open_file, keymap_opts)
+  vim.keymap.set("n", "<C-w>f", actions.open_file_split, keymap_opts)
+  vim.keymap.set("n", "<C-w>gf", actions.open_file_vsplit, keymap_opts)
 end
 
 -- Get current state

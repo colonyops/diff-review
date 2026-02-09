@@ -143,6 +143,18 @@ M.setup = function(opts)
   vim.api.nvim_create_user_command("DiffReviewSubmit", function()
     require("diff-review.submit").submit_current_review()
   end, { desc = "Submit review comments to GitHub" })
+
+  vim.api.nvim_create_user_command("DiffReviewOpenFile", function()
+    require("diff-review.actions").open_file()
+  end, { desc = "Open file at cursor in current window" })
+
+  vim.api.nvim_create_user_command("DiffReviewOpenFileSplit", function()
+    require("diff-review.actions").open_file_split()
+  end, { desc = "Open file at cursor in horizontal split" })
+
+  vim.api.nvim_create_user_command("DiffReviewOpenFileVsplit", function()
+    require("diff-review.actions").open_file_vsplit()
+  end, { desc = "Open file at cursor in vertical split" })
 end
 
 M.config = config
