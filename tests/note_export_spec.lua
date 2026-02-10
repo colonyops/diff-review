@@ -21,6 +21,9 @@ describe("note_export", function()
     if note_mode.get_state().is_active then
       note_mode.exit()
     end
+    -- Clean up persisted test sets
+    local note_persistence = require("diff-review.note_persistence")
+    note_persistence.delete_set(test_set)
   end)
 
   describe("export_notes", function()

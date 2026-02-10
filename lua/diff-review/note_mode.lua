@@ -254,18 +254,21 @@ end
 function M.restore_session()
   load_session()
 
-  if M.state.is_active then
-    local opts = config.get()
-    if opts.notes and opts.notes.auto_restore then
-      -- Re-enter note mode silently
-      M.state.is_active = false -- Reset state
-      M.enter(M.state.current_set)
-    else
-      -- Clear session if auto-restore disabled
-      note_persistence.clear_global_session()
-      M.state.is_active = false
-    end
+  if not M.state.is_active then
+    return
   end
+
+  local opts = config.get()
+  if not (opts.notes and opts.notes.auto_restore) then
+    -- Clear session if auto-restore disabled
+    note_persistence.clear_global_session()
+    M.state.is_active = false
+    return
+  end
+
+  -- Re-enter note mode silently
+  M.state.is_active = false -- Reset state
+  M.enter(M.state.current_set)
 end
 
 -- Get current state

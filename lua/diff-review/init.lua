@@ -226,8 +226,8 @@ M.setup = function(opts)
         { prompt = string.format("Clear all notes in set '%s'?", state.current_set) },
         function(choice)
           if choice == "Yes" then
-            local notes = require("diff-review.notes")
-            local count = notes.clear_set(state.current_set)
+            local notes_api = require("diff-review.notes")
+            local count = notes_api.clear_set(state.current_set)
             vim.notify(string.format("Cleared %d notes from set '%s'", count, state.current_set), vim.log.levels.INFO)
             local note_ui = require("diff-review.note_ui")
             note_ui.clear_all()
@@ -291,9 +291,9 @@ M.setup = function(opts)
         vim.notify("Clipboard copy failed: " .. clip_err, vim.log.levels.ERROR)
         return
       end
-      local notes = require("diff-review.notes")
-      local state = note_mode.get_state()
-      local set_notes = notes.get_for_set(state.current_set)
+      local notes_api = require("diff-review.notes")
+      local note_state = note_mode.get_state()
+      local set_notes = notes_api.get_for_set(note_state.current_set)
       vim.notify(
         string.format("Copied %d note(s) to clipboard (%s mode)", #set_notes, mode),
         vim.log.levels.INFO
