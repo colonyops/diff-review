@@ -38,6 +38,17 @@ COMMANDS                                               *diff-review-commands*
 :DiffReviewSubmit                                      *:DiffReviewSubmit*
     Submit review comments to GitHub (PR reviews only).
 
+:DiffNote [subcommand] [args]                          *:DiffNote*
+    Note mode operations for commenting on any codebase files.
+    Subcommands:
+      enter [set]   Enter note mode (default set if not specified)
+      exit          Exit note mode
+      toggle [set]  Toggle note mode on/off
+      clear         Clear all notes in current set
+      list          List and switch between note sets
+      switch <set>  Switch to a different note set
+      copy [mode]   Copy to clipboard (notes/full)
+
 ==============================================================================
 KEYMAPS                                                  *diff-review-keymaps*
 
@@ -58,6 +69,14 @@ Diff panel (default):
   <leader>d    Delete comment at cursor
   <leader>l    List comments for current file
   <leader>v    View all comments in quickfix
+
+Note mode (when active):
+  Same keymaps as diff panel - works in normal buffers during editing
+  <leader>c    Add note at cursor (or range in visual mode)
+  <leader>e    Edit note at cursor
+  <leader>d    Delete note at cursor
+  <leader>l    List notes for current file
+  <leader>v    View all notes across all files
 
 ==============================================================================
 CONFIGURATION                                          *diff-review-config*
@@ -111,6 +130,10 @@ All options are optional. Defaults:
       tool = "git", -- "git" | "difftastic" | "delta" | "custom"
       custom_command = "", -- used when tool = "custom", supports {args}
     },
+    notes = {
+      default_set = "default", -- Default note set name
+      auto_restore = true, -- Auto-restore note mode on startup
+    },
   })
 <
 
@@ -138,6 +161,35 @@ Custom diff tools can be configured with a command string that includes
     },
   })
 <
+
+==============================================================================
+NOTE MODE                                              *diff-review-note-mode*
+
+Note mode allows adding comments to any files during normal editing without
+requiring diff or review context. Perfect for code audits, documentation,
+learning notes, or refactoring plans.
+
+Features:
+- Works in any file during normal editing (no special layout)
+- Multiple note sets for different purposes
+- Persistent across sessions with auto-restore
+- Same keymaps and UI as diff review mode
+- Separate storage from review comments
+
+Usage:
+1. Enter note mode with :DiffNote enter [set_name]
+2. Navigate files normally and add notes with <leader>c
+3. Notes auto-save on each change
+4. Exit with :DiffNote exit or toggle with :DiffNote toggle
+
+Storage:
+Notes are stored in .diff-review/notes/<set_name>.json and persist across
+Neovim sessions. Session state (active mode, current set) is saved to
+~/.local/share/nvim/diff-review/note_session.json for auto-restore.
+
+Export:
+:DiffNote copy         Export notes with line numbers
+:DiffNote copy full    Export notes with code context
 
 ==============================================================================
 NOTES                                                   *diff-review-notes*

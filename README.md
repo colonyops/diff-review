@@ -660,17 +660,23 @@ Run `:DiffReviewHealth` to diagnose layout issues and detect session plugins.
 
 ```
 lua/diff-review/
-├── init.lua         # Main entry point
-├── config.lua       # Configuration management
-├── layout.lua       # Window/buffer management
-├── file_list.lua    # File list panel with tree/flat views
-├── tree_view.lua    # Tree structure building and flattening
-├── diff.lua         # Git diff execution/parsing
-├── ui.lua           # Comment UI rendering
-├── comments.lua     # Comment storage and management
-├── actions.lua      # Comment actions (add/edit/delete)
-├── popup.lua        # Comment input popup
-└── reviews.lua      # Review session management
+├── init.lua              # Main entry point
+├── config.lua            # Configuration management
+├── layout.lua            # Window/buffer management
+├── file_list.lua         # File list panel with tree/flat views
+├── tree_view.lua         # Tree structure building and flattening
+├── diff.lua              # Git diff execution/parsing
+├── ui.lua                # Comment UI rendering (diff review)
+├── comments.lua          # Comment storage and management
+├── actions.lua           # Comment actions (add/edit/delete)
+├── popup.lua             # Comment input popup
+├── reviews.lua           # Review session management
+├── notes.lua             # Note storage (note mode)
+├── note_mode.lua         # Note mode state management
+├── note_persistence.lua  # Note persistence layer
+├── note_ui.lua           # Note UI rendering
+├── note_actions.lua      # Note actions
+└── note_export.lua       # Note export functionality
 ```
 
 ### Testing Locally
