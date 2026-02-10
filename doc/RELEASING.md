@@ -11,6 +11,22 @@ matching `vX.Y.Z` is pushed.
 
 ## Release
 
+### Using svu (recommended)
+
+Install `svu` if needed, then run:
+
+```bash
+task release
+```
+
+This will:
+- verify a clean `main`
+- run tests
+- compute the next version via `svu`
+- tag and push the release tag
+
+### Manual
+
 ```bash
 git checkout main
 git pull

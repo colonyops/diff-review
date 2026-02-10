@@ -25,12 +25,12 @@ Tests are written using [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
 
 Run all tests:
 ```bash
-make test
+task test
 ```
 
 Run a specific test file:
 ```bash
-make test-file FILE=tests/config_spec.lua
+task test-file -- tests/config_spec.lua
 ```
 
 ### Test Coverage
@@ -51,7 +51,7 @@ make test-file FILE=tests/config_spec.lua
 
 The first time you run tests, plenary.nvim will be automatically cloned to `/tmp/plenary.nvim`. To clean up:
 ```bash
-make clean-test
+task clean-test
 ```
 
 ### Writing New Tests

@@ -1,0 +1,47 @@
+version: "3"
+
+vars:
+  PLENARY_DIR: /tmp/plenary.nvim
+
+tasks:
+  test-setup:
+    desc: Install plenary.nvim test dependency
+    cmds:
+      - cmd: |
+          if [ ! -d "{{.PLENARY_DIR}}" ]; then
+            echo "Installing plenary.nvim to {{.PLENARY_DIR}}..."
+            git clone https://github.com/nvim-lua/plenary.nvim "{{.PLENARY_DIR}}"
+          fi
+
+  test:
+    desc: Run all tests
+    deps:
+      - test-setup
+    cmds:
+      - cmd: |
+          PLENARY_DIR="{{.PLENARY_DIR}}" nvim --headless --noplugin -u tests/minimal_init.lua \
+            -c "PlenaryBustedDirectory tests/ { minimal_init = 'tests/minimal_init.lua' }"
+
+  test-file:
+    desc: Run a single test file (pass path via args, e.g. task test-file -- tests/config_spec.lua)
+    deps:
+      - test-setup
+    cmds:
+      - cmd: |
+          if [ -z "{{.CLI_ARGS}}" ]; then
+            echo "Usage: task test-file -- tests/config_spec.lua"
+            exit 1
+          fi
+      - cmd: |
+          PLENARY_DIR="{{.PLENARY_DIR}}" nvim --headless --noplugin -u tests/minimal_init.lua \
+            -c "PlenaryBustedFile {{.CLI_ARGS}}"
+
+  clean-test:
+    desc: Remove test dependency checkout
+    cmds:
+      - rm -rf "{{.PLENARY_DIR}}"
+
+  release:
+    desc: Run release script (requires svu)
+    cmds:
+      - ./scripts/release.sh
