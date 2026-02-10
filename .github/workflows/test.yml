@@ -18,6 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Install Task
+        uses: arduino/setup-task@v1
+
       - name: Install Neovim
         uses: rhysd/action-setup-vim@v1
         with:
@@ -25,4 +28,4 @@ jobs:
           version: ${{ matrix.neovim-version }}
 
       - name: Run tests
-        run: make test
+        run: task test
