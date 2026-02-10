@@ -35,7 +35,7 @@ if [[ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]]; then
 fi
 
 echo "Running tests..."
-make test
+task test
 
 NEXT_VERSION=$(svu next)
 if [[ -z "$NEXT_VERSION" ]]; then
