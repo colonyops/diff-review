@@ -79,29 +79,22 @@ require('diff-review').setup()
 
 ### Commands
 
-Open the diff review window:
+**Main diff review command:**
 ```vim
-:DiffReview
+:DiffReview              " Open with prompt to select type
+:DiffReview origin/main  " Review against branch
+:DiffReview pr:123       " Review pull request
+:DiffReview close        " Close review
+:DiffReview toggle       " Toggle visibility
+:DiffReview list         " List/switch reviews
+:DiffReview copy [mode]  " Copy to clipboard (comments/full/diff)
+:DiffReview submit       " Submit to GitHub
+:DiffReview health       " Health check
 ```
 
-Review changes against a specific branch:
+**Shortcut for toggling** (most common operation):
 ```vim
-:DiffReview origin/main
-```
-
-Review a pull request (requires gh CLI):
-```vim
-:DiffReviewPR 123
-```
-
-Submit PR review comments (PR reviews only):
-```vim
-:DiffReviewSubmit
-```
-
-Toggle diff review window (preserves state):
-```vim
-:DiffReviewToggle
+:DiffReviewToggle        " Quick toggle (preserves state)
 ```
 
 ### Navigating to Files
@@ -261,6 +254,12 @@ require('diff-review').setup({
   -- Persistence options
   persistence = {
     auto_save = true, -- Auto-save comments after each change
+  },
+
+  -- Note mode options
+  notes = {
+    default_set = "default", -- Default note set name
+    auto_restore = true, -- Auto-restore note mode on startup
   },
 })
 ```
@@ -422,24 +421,161 @@ Comments are stored locally in `.diff-review/` directory and persist across sess
 
 ### Pull Request Reviews
 
-When reviewing a PR (via `:DiffReviewPR`), you can submit comments directly to GitHub:
+When reviewing a PR (via `:DiffReview pr:123`), you can submit comments directly to GitHub:
 
 ```vim
-:DiffReviewSubmit
+:DiffReview submit
 ```
 
 This requires the [GitHub CLI](https://cli.github.com/) to be installed and authenticated.
 
-## Exporting Comments
+## Note Mode
 
-Export all comments to markdown:
+Note mode allows you to add comments to any files in your codebase without requiring diff or review context. Perfect for code audits, documentation, learning notes, or refactoring plans.
+
+### Features
+
+- **Works anywhere**: Comment on any file during normal editing, no special layout required
+- **Multiple note sets**: Organize notes for different purposes (e.g., "security-audit", "refactoring")
+- **Persistent**: Notes auto-save and persist across Neovim sessions
+- **Session restore**: Automatically restores note mode on startup (configurable)
+- **Same UI**: Reuses diff review keymaps and styling for consistency
+
+### Commands
+
+**All note mode operations:**
 ```vim
-:DiffReviewExport
+:DiffNote enter [set]    " Enter note mode (default set if not specified)
+:DiffNote exit           " Exit note mode
+:DiffNote toggle [set]   " Toggle note mode
+:DiffNote clear          " Clear all notes in current set
+:DiffNote list           " List and switch between sets
+:DiffNote switch <set>   " Switch to a different set
+:DiffNote copy [mode]    " Copy to clipboard (notes/full)
 ```
 
-Export with annotated diff:
+**Examples:**
 ```vim
-:DiffReviewExport annotated
+:DiffNote enter security-audit    " Start security audit notes
+:DiffNote toggle                  " Quick toggle
+:DiffNote copy full               " Export with code context
+```
+
+### Usage
+
+1. **Enter note mode** with `:DiffNote enter [set_name]`
+2. **Navigate files normally** (`:edit`, buffer switches, etc.)
+3. **Add comments** using the same keymaps as diff review:
+   - `<leader>c` - Add comment at cursor (or range in visual mode)
+   - `<leader>e` - Edit comment at cursor
+   - `<leader>d` - Delete comment at cursor
+   - `<leader>l` - List comments for current file
+   - `<leader>v` - View all comments (across all files)
+4. **Comments auto-save** on each change
+5. **Exit mode** with `:DiffNote exit` or toggle with `:DiffNote toggle`
+
+### Storage
+
+Notes are stored in `.diff-review/notes/` directory:
+```
+.diff-review/
+├── notes/
+│   ├── default.json          # Default note set
+│   ├── security-audit.json   # Named set
+│   └── refactoring.json      # Another named set
+```
+
+### Configuration
+
+Configure note mode behavior in your setup:
+
+```lua
+require('diff-review').setup({
+  notes = {
+    default_set = "default",  -- Default note set name
+    auto_restore = true,      -- Auto-restore note mode on startup
+  },
+})
+```
+
+### Example Workflows
+
+**Code audit:**
+```vim
+:DiffNote enter security-audit
+" Navigate files and add notes about security concerns
+" Notes persist across sessions
+```
+
+**Refactoring plan:**
+```vim
+:DiffNote enter refactoring
+" Document areas that need refactoring
+" Switch between note sets as needed
+:DiffNote switch technical-debt
+```
+
+**Learning codebase:**
+```vim
+:DiffNote enter learning
+" Add notes about how things work
+" View all notes: <leader>v
+```
+
+### Exporting Notes
+
+Copy all notes to clipboard in markdown format:
+
+**Notes only (with line numbers):**
+```vim
+:DiffNote copy
+```
+
+Output format:
+```markdown
+## Notes
+
+**Note Set:** security-audit
+**Date:** 2024-01-15 10:30
+
+---
+
+### src/auth.lua
+
+- Line 45: Potential SQL injection vulnerability
+- Lines 60-65: Missing input validation
+
+### src/user.lua
+
+- Line 23: TODO: Add rate limiting
+
+---
+
+**Total:** 3 notes across 2 files
+```
+
+**Full export (with code context):**
+```vim
+:DiffNote copy full
+```
+
+Includes 2 lines of code context before/after each note with syntax highlighting.
+
+### Coexistence with Diff Review
+
+Note mode and diff review mode can run simultaneously:
+- Separate namespaces prevent conflicts
+- Separate storage directories
+- Both can be visible at the same time
+- No conversion between notes and review comments
+
+## Exporting Comments
+
+Export all review comments to markdown:
+```vim
+:DiffReview copy           " Comments with line numbers
+:DiffReview copy full      " Comments with code context
+:DiffReview copy diff      " Annotated diff format
 ```
 
 ## Troubleshooting
@@ -524,17 +660,23 @@ Run `:DiffReviewHealth` to diagnose layout issues and detect session plugins.
 
 ```
 lua/diff-review/
-├── init.lua         # Main entry point
-├── config.lua       # Configuration management
-├── layout.lua       # Window/buffer management
-├── file_list.lua    # File list panel with tree/flat views
-├── tree_view.lua    # Tree structure building and flattening
-├── diff.lua         # Git diff execution/parsing
-├── ui.lua           # Comment UI rendering
-├── comments.lua     # Comment storage and management
-├── actions.lua      # Comment actions (add/edit/delete)
-├── popup.lua        # Comment input popup
-└── reviews.lua      # Review session management
+├── init.lua              # Main entry point
+├── config.lua            # Configuration management
+├── layout.lua            # Window/buffer management
+├── file_list.lua         # File list panel with tree/flat views
+├── tree_view.lua         # Tree structure building and flattening
+├── diff.lua              # Git diff execution/parsing
+├── ui.lua                # Comment UI rendering (diff review)
+├── comments.lua          # Comment storage and management
+├── actions.lua           # Comment actions (add/edit/delete)
+├── popup.lua             # Comment input popup
+├── reviews.lua           # Review session management
+├── notes.lua             # Note storage (note mode)
+├── note_mode.lua         # Note mode state management
+├── note_persistence.lua  # Note persistence layer
+├── note_ui.lua           # Note UI rendering
+├── note_actions.lua      # Note actions
+└── note_export.lua       # Note export functionality
 ```
 
 ### Testing Locally

@@ -92,6 +92,12 @@ M.defaults = {
   persistence = {
     auto_save = true,      -- Auto-save comments after each change
   },
+
+  -- Note mode options
+  notes = {
+    default_set = "default",  -- Default note set name
+    auto_restore = true,      -- Auto-restore note mode on startup
+  },
 }
 
 M.options = {}
