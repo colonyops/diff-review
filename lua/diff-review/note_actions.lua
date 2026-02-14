@@ -4,6 +4,7 @@ local notes = require("diff-review.notes")
 local note_mode = require("diff-review.note_mode")
 local note_ui = require("diff-review.note_ui")
 local popup = require("diff-review.popup")
+local git_utils = require("diff-review.git_utils")
 
 -- Get current file path and buffer
 local function get_current_file()
@@ -15,12 +16,7 @@ local function get_current_file()
     return nil, nil
   end
 
-  -- Convert to relative path if in git repo
-  local git_utils = require("diff-review.git_utils")
-  local git_root, err = git_utils.get_git_root()
-  if git_root then
-    filepath = vim.fn.fnamemodify(filepath, ":.")
-  end
+  filepath = git_utils.normalize_file_key(filepath)
 
   return filepath, bufnr
 end

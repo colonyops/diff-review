@@ -38,4 +38,31 @@ describe("git_utils", function()
       assert.is_nil(err)
     end)
   end)
+
+  describe("normalize_file_key", function()
+    it("should normalize to repo-root-relative path when in repo", function()
+      local original_get_repo_root = git_utils.get_repo_root
+      git_utils.get_repo_root = function()
+        return "/tmp/example-repo", nil
+      end
+
+      local normalized = git_utils.normalize_file_key("/tmp/example-repo/lua/diff-review/note_mode.lua")
+      assert.equals("lua/diff-review/note_mode.lua", normalized)
+
+      git_utils.get_repo_root = original_get_repo_root
+    end)
+
+    it("should fallback to absolute path when repo root is unavailable", function()
+      local original_get_repo_root = git_utils.get_repo_root
+      git_utils.get_repo_root = function()
+        return nil, "Not in a git repository"
+      end
+
+      local normalized = git_utils.normalize_file_key("lua/diff-review/note_mode.lua")
+      assert.is_true(normalized:sub(1, 1) == "/")
+      assert.is_true(normalized:match("lua/diff%-review/note_mode%.lua$") ~= nil)
+
+      git_utils.get_repo_root = original_get_repo_root
+    end)
+  end)
 end)

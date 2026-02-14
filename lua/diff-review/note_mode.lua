@@ -4,6 +4,7 @@ local config = require("diff-review.config")
 local notes = require("diff-review.notes")
 local note_persistence = require("diff-review.note_persistence")
 local note_ui = require("diff-review.note_ui")
+local git_utils = require("diff-review.git_utils")
 
 -- State
 M.state = {
@@ -14,6 +15,22 @@ M.state = {
 
 -- Autocmd group for note mode
 local augroup = vim.api.nvim_create_augroup("DiffReviewNoteMode", { clear = true })
+local mapped_buffers = {}
+
+local function clear_buffer_keymaps(bufnr)
+  local opts = config.get()
+  if not opts or not opts.keymaps then
+    return
+  end
+  local keymaps = opts.keymaps
+
+  pcall(vim.keymap.del, "n", keymaps.add_comment, { buffer = bufnr })
+  pcall(vim.keymap.del, "v", keymaps.add_comment, { buffer = bufnr })
+  pcall(vim.keymap.del, "n", keymaps.edit_comment, { buffer = bufnr })
+  pcall(vim.keymap.del, "n", keymaps.delete_comment, { buffer = bufnr })
+  pcall(vim.keymap.del, "n", keymaps.list_comments, { buffer = bufnr })
+  pcall(vim.keymap.del, "n", keymaps.view_all_comments, { buffer = bufnr })
+end
 
 -- Auto-save notes for current set
 local function auto_save()
@@ -59,6 +76,9 @@ local function setup_buffer_keymaps(bufnr)
   if not opts or not opts.keymaps then
     return -- Config not initialized, skip keymap setup
   end
+  if mapped_buffers[bufnr] then
+    return
+  end
   local keymaps = opts.keymaps
 
   -- Add comment
@@ -89,6 +109,8 @@ local function setup_buffer_keymaps(bufnr)
   vim.keymap.set("n", keymaps.view_all_comments, function()
     require("diff-review.note_actions").view_all_comments()
   end, { buffer = bufnr, desc = "View all comments" })
+
+  mapped_buffers[bufnr] = true
 end
 
 -- Render notes for current buffer
@@ -105,12 +127,7 @@ local function render_current_buffer()
     return
   end
 
-  -- Convert to relative path if in git repo
-  local git_utils = require("diff-review.git_utils")
-  local git_root, err = git_utils.get_git_root()
-  if git_root then
-    filepath = vim.fn.fnamemodify(filepath, ":.")
-  end
+  filepath = git_utils.normalize_file_key(filepath)
 
   note_ui.update_display(bufnr, filepath, M.state.current_set)
 end
@@ -180,6 +197,13 @@ function M.exit()
 
   -- Clear autocmds
   vim.api.nvim_clear_autocmds({ group = augroup })
+
+  for bufnr, _ in pairs(mapped_buffers) do
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      clear_buffer_keymaps(bufnr)
+    end
+  end
+  mapped_buffers = {}
 
   -- Clear session state
   note_persistence.clear_global_session()

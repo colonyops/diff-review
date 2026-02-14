@@ -1,11 +1,14 @@
 local note_mode = require("diff-review.note_mode")
 local notes = require("diff-review.notes")
 local note_persistence = require("diff-review.note_persistence")
+local config = require("diff-review.config")
 
 describe("note_mode edge cases", function()
   local test_set = "edge-test-" .. os.time()
 
   before_each(function()
+    config.setup({})
+
     -- Ensure clean state
     if note_mode.get_state().is_active then
       note_mode.exit()
@@ -84,6 +87,18 @@ describe("note_mode edge cases", function()
   end)
 
   describe("invalid buffer state", function()
+    it("should remove note-mode keymaps when exiting", function()
+      local add_key = config.get().keymaps.add_comment
+
+      note_mode.enter(test_set)
+      local before = vim.fn.maparg(add_key, "n", false, true)
+      assert.equals(add_key, before.lhs)
+
+      note_mode.exit()
+      local after = vim.fn.maparg(add_key, "n", false, true)
+      assert.is_true(after.lhs == nil or after.lhs == "")
+    end)
+
     it("should handle enter when already active", function()
       note_mode.enter(test_set)
       local state1 = note_mode.get_state()
