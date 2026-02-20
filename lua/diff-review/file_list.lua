@@ -16,8 +16,25 @@ M.state = {
   view_mode = (config.get().file_list and config.get().file_list.view_mode) or "tree",  -- "flat" or "tree"
   tree = nil,  -- Tree structure for tree view
   flat_tree = nil,  -- Flattened tree for rendering
-  initial_load = true,  -- Flag for initial load to select first visual file
 }
+
+-- Timer for debouncing diff updates during rapid navigation
+local _diff_timer = nil
+
+local function schedule_diff_update()
+  if _diff_timer then
+    _diff_timer:stop()
+    _diff_timer:close()
+  end
+  _diff_timer = vim.loop.new_timer()
+  _diff_timer:start(100, 0, vim.schedule_wrap(function()
+    if _diff_timer then
+      _diff_timer:close()
+      _diff_timer = nil
+    end
+    M.update_diff()
+  end))
+end
 
 -- Status icons and colors
 local function get_status_icons()
@@ -438,18 +455,6 @@ function M.render()
     table.insert(lines, "  No changes found")
   elseif M.state.view_mode == "tree" then
     render_tree_view(state, lines, highlights)
-
-    -- On initial load, always select first file in visual tree order
-    if M.state.initial_load and M.state.flat_tree and #M.state.flat_tree > 0 then
-      for _, entry in ipairs(M.state.flat_tree) do
-        if entry.index then
-          M.state.current_index = entry.index
-          M.state.initial_load = false
-          M.update_diff()
-          break
-        end
-      end
-    end
   else
     -- Get comment counts for all files
     local comments = require("diff-review.comments")
@@ -646,7 +651,7 @@ function M.next_file()
         if M.state.flat_tree[i].index then
           M.state.current_index = M.state.flat_tree[i].index
           M.render()
-          M.update_diff()
+          schedule_diff_update()
           return
         end
       end
@@ -655,7 +660,7 @@ function M.next_file()
         if M.state.flat_tree[i].index then
           M.state.current_index = M.state.flat_tree[i].index
           M.render()
-          M.update_diff()
+          schedule_diff_update()
           return
         end
       end
@@ -669,7 +674,7 @@ function M.next_file()
   end
 
   M.render()
-  M.update_diff()
+  schedule_diff_update()
 end
 
 -- Navigate to previous file
@@ -694,7 +699,7 @@ function M.prev_file()
         if M.state.flat_tree[i].index then
           M.state.current_index = M.state.flat_tree[i].index
           M.render()
-          M.update_diff()
+          schedule_diff_update()
           return
         end
       end
@@ -703,7 +708,7 @@ function M.prev_file()
         if M.state.flat_tree[i].index then
           M.state.current_index = M.state.flat_tree[i].index
           M.render()
-          M.update_diff()
+          schedule_diff_update()
           return
         end
       end
@@ -717,7 +722,7 @@ function M.prev_file()
   end
 
   M.render()
-  M.update_diff()
+  schedule_diff_update()
 end
 
 -- Sync selection to cursor position (for manual cursor movement)
@@ -739,8 +744,8 @@ function M.sync_selection_to_cursor()
         -- Only update if it's a different file
         if M.state.current_index ~= entry.index then
           M.state.current_index = entry.index
-          M.update_diff()
           M.render()
+          schedule_diff_update()
         end
       end
     end
@@ -749,8 +754,8 @@ function M.sync_selection_to_cursor()
     if line_num >= 1 and line_num <= #M.state.files then
       if M.state.current_index ~= line_num then
         M.state.current_index = line_num
-        M.update_diff()
         M.render()
+        schedule_diff_update()
       end
     end
   end

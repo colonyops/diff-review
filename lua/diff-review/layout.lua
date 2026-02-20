@@ -145,8 +145,8 @@ function M.open(review_type, base, head, pr_number)
 
   M.state.is_open = true
 
-  -- Load file list
-  require("diff-review.file_list").render()
+  -- Load file list and trigger initial diff render
+  require("diff-review.file_list").refresh()
 
   -- Validate layout actually opened correctly
   vim.defer_fn(function()
