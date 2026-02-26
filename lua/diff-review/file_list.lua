@@ -18,8 +18,9 @@ M.state = {
   flat_tree = nil,  -- Flattened tree for rendering
 }
 
--- Timer for debouncing diff updates during rapid navigation
+-- Timers for debouncing rapid navigation
 local _diff_timer = nil
+local _render_timer = nil
 
 local function schedule_diff_update()
   if _diff_timer then
@@ -33,6 +34,21 @@ local function schedule_diff_update()
       _diff_timer = nil
     end
     M.update_diff()
+  end))
+end
+
+local function schedule_render()
+  if _render_timer then
+    _render_timer:stop()
+    _render_timer:close()
+  end
+  _render_timer = vim.loop.new_timer()
+  _render_timer:start(30, 0, vim.schedule_wrap(function()
+    if _render_timer then
+      _render_timer:close()
+      _render_timer = nil
+    end
+    M.render()
   end))
 end
 
@@ -433,9 +449,16 @@ function M.render()
     return
   end
 
-  -- Get files from diff module
-  local diff = require("diff-review.diff")
-  M.state.files = diff.get_changed_files()
+  -- Fetch files only if not already cached (refresh() clears this)
+  if #M.state.files == 0 then
+    local diff = require("diff-review.diff")
+    M.state.files = diff.get_changed_files()
+  end
+
+  -- Cache repo root name (doesn't change during a session)
+  if not M.state.tree_root_name then
+    M.state.tree_root_name = get_repo_root_name()
+  end
 
   -- Make buffer modifiable
   vim.api.nvim_buf_set_option(state.file_list_buf, "modifiable", true)
@@ -448,8 +471,6 @@ function M.render()
   for _, line in ipairs(header_lines) do
     table.insert(lines, line)
   end
-
-  M.state.tree_root_name = get_repo_root_name()
 
   if #M.state.files == 0 then
     table.insert(lines, "  No changes found")
@@ -650,7 +671,7 @@ function M.next_file()
       for i = current_pos + 1, #M.state.flat_tree do
         if M.state.flat_tree[i].index then
           M.state.current_index = M.state.flat_tree[i].index
-          M.render()
+          schedule_render()
           schedule_diff_update()
           return
         end
@@ -659,7 +680,7 @@ function M.next_file()
       for i = 1, current_pos do
         if M.state.flat_tree[i].index then
           M.state.current_index = M.state.flat_tree[i].index
-          M.render()
+          schedule_render()
           schedule_diff_update()
           return
         end
@@ -673,7 +694,7 @@ function M.next_file()
     end
   end
 
-  M.render()
+  schedule_render()
   schedule_diff_update()
 end
 
@@ -698,7 +719,7 @@ function M.prev_file()
       for i = current_pos - 1, 1, -1 do
         if M.state.flat_tree[i].index then
           M.state.current_index = M.state.flat_tree[i].index
-          M.render()
+          schedule_render()
           schedule_diff_update()
           return
         end
@@ -707,7 +728,7 @@ function M.prev_file()
       for i = #M.state.flat_tree, current_pos, -1 do
         if M.state.flat_tree[i].index then
           M.state.current_index = M.state.flat_tree[i].index
-          M.render()
+          schedule_render()
           schedule_diff_update()
           return
         end
@@ -721,7 +742,7 @@ function M.prev_file()
     end
   end
 
-  M.render()
+  schedule_render()
   schedule_diff_update()
 end
 
@@ -799,9 +820,11 @@ end
 -- Refresh the file list
 function M.refresh()
   M.state.current_index = 1
+  M.state.files = {}  -- Force re-fetch on next render
   M.state.cached_file_stats = nil  -- Invalidate cache on refresh
   M.state.tree = nil  -- Invalidate tree cache
   M.state.flat_tree = nil
+  M.state.tree_root_name = nil  -- Re-fetch root name
   M.render()
   if #M.state.files > 0 then
     M.update_diff()
