@@ -92,10 +92,69 @@ require('diff-review').setup()
 :DiffReview health       " Health check
 ```
 
-**Shortcut for toggling** (most common operation):
+**Top-level shortcuts:**
 ```vim
-:DiffReviewToggle        " Quick toggle (preserves state)
+:DiffReviewToggle           " Quick toggle (preserves state)
+:DiffReviewClose            " Close review
+:DiffReviewList             " List/switch reviews
+:DiffReviewCopy [mode]      " Copy to clipboard (comments/full/diff)
+:DiffNoteToggle [set]       " Toggle note mode
+:DiffNoteCopy [mode]        " Copy notes to clipboard (notes/full)
 ```
+
+### Recommended Keymaps
+
+```lua
+vim.keymap.set("n", "<leader>dr", "<cmd>DiffReviewToggle<CR>",  { desc = "Toggle diff review" })
+vim.keymap.set("n", "<leader>dR", "<cmd>DiffReviewList<CR>",    { desc = "List/switch reviews" })
+vim.keymap.set("n", "<leader>dy", "<cmd>DiffReviewCopy<CR>",    { desc = "Copy review comments" })
+vim.keymap.set("n", "<leader>dn", "<cmd>DiffNoteToggle<CR>",    { desc = "Toggle note mode" })
+vim.keymap.set("n", "<leader>dN", "<cmd>DiffNoteCopy<CR>",      { desc = "Copy notes" })
+```
+
+### Workflows
+
+#### Reviewing uncommitted changes
+
+Open a review of your working tree, annotate as you go, then copy to clipboard for a commit message or PR description.
+
+```vim
+:DiffReview              " open uncommitted changes (or pick type interactively)
+" navigate with j/k, <Enter> to open a file diff
+" <leader>c to add a comment, <leader>v to view all comments
+:DiffReviewCopy full     " copy comments with surrounding code context
+:DiffReviewToggle        " hide the panel when done, reopen later with state preserved
+```
+
+#### Reviewing a branch or PR
+
+```vim
+:DiffReview origin/main  " compare current HEAD against a branch
+:DiffReview pr:123       " pull request review
+" annotate files, then:
+:DiffReviewCopy          " copy comment summary to clipboard
+:DiffReview submit       " or submit directly to GitHub (requires gh CLI)
+```
+
+#### Switching between multiple open reviews
+
+```vim
+:DiffReviewList          " open picker — select any saved review to resume it
+```
+
+#### Code audit / codebase notes
+
+Note mode works outside of any diff context — annotate files during normal editing.
+
+```vim
+:DiffNoteToggle security-audit   " start (or resume) a named note set
+" navigate and edit files normally
+" <leader>c to add a note, <leader>v to view all notes
+:DiffNoteCopy full               " copy notes with code context
+:DiffNoteToggle                  " exit note mode
+```
+
+Use `:DiffNote switch <set>` to jump between note sets without exiting mode.
 
 ### Navigating to Files
 

@@ -195,6 +195,98 @@ M.setup = function(opts)
     require("diff-review.layout").toggle()
   end, { desc = "Toggle diff review window (shortcut)" })
 
+  vim.api.nvim_create_user_command("DiffReviewClose", function()
+    require("diff-review.layout").close()
+  end, { desc = "Close diff review window" })
+
+  vim.api.nvim_create_user_command("DiffReviewCopy", function(opts)
+    local args = vim.split(opts.args or "", "%s+", { trimempty = true })
+    local export = require("diff-review.export")
+    local mode = args[1] or "comments"
+    local valid_modes = { comments = true, full = true, diff = true }
+    if not valid_modes[mode] then
+      vim.notify("Invalid export mode: " .. mode .. ". Use: comments, full, or diff", vim.log.levels.ERROR)
+      return
+    end
+    local content, err = export.export(mode)
+    if err then
+      vim.notify("Export failed: " .. err, vim.log.levels.ERROR)
+      return
+    end
+    local success, clip_err = export.copy_to_clipboard(content)
+    if not success then
+      vim.notify("Clipboard copy failed: " .. clip_err, vim.log.levels.ERROR)
+      return
+    end
+    local all_comments = require("diff-review.comments").get_all()
+    vim.notify(
+      string.format("Copied %d comment(s) to clipboard (%s mode)", #all_comments, mode),
+      vim.log.levels.INFO
+    )
+  end, {
+    desc = "Copy diff review comments to clipboard",
+    nargs = "?",
+    complete = function()
+      return { "comments", "full", "diff" }
+    end,
+  })
+
+  vim.api.nvim_create_user_command("DiffReviewList", function()
+    require("diff-review.picker").show()
+  end, { desc = "List and switch diff reviews" })
+
+  vim.api.nvim_create_user_command("DiffNoteToggle", function(opts)
+    local args = vim.split(opts.args or "", "%s+", { trimempty = true })
+    local set_name = args[1] or "default"
+    require("diff-review.note_mode").toggle(set_name)
+  end, {
+    desc = "Toggle note mode",
+    nargs = "?",
+    complete = function()
+      local note_persistence = require("diff-review.note_persistence")
+      return note_persistence.list_sets()
+    end,
+  })
+
+  vim.api.nvim_create_user_command("DiffNoteCopy", function(opts)
+    local args = vim.split(opts.args or "", "%s+", { trimempty = true })
+    local note_export = require("diff-review.note_export")
+    local note_mode = require("diff-review.note_mode")
+    local mode = args[1] or "notes"
+    local valid_modes = { notes = true, full = true }
+    if not valid_modes[mode] then
+      vim.notify("Invalid export mode: " .. mode .. ". Use: notes or full", vim.log.levels.ERROR)
+      return
+    end
+    local content, err
+    if mode == "notes" then
+      content, err = note_export.export_notes()
+    else
+      content, err = note_export.export_notes_with_context()
+    end
+    if err then
+      vim.notify("Export failed: " .. err, vim.log.levels.ERROR)
+      return
+    end
+    local success, clip_err = note_export.copy_to_clipboard(content)
+    if not success then
+      vim.notify("Clipboard copy failed: " .. clip_err, vim.log.levels.ERROR)
+      return
+    end
+    local notes_api = require("diff-review.notes")
+    local note_state = note_mode.get_state()
+    local set_notes = notes_api.get_for_set(note_state.current_set)
+    vim.notify(
+      string.format("Copied %d note(s) to clipboard (%s mode)", #set_notes, mode),
+      vim.log.levels.INFO
+    )
+  end, {
+    desc = "Copy notes to clipboard",
+    nargs = "?",
+    complete = function()
+      return { "notes", "full" }
+    end,
+  })
 
   -- DiffNote command with subcommands
   vim.api.nvim_create_user_command("DiffNote", function(opts)
