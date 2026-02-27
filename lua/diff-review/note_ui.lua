@@ -12,9 +12,16 @@ local LINE_HIGHLIGHT_PRIORITY = 200
 M.ns_id = vim.api.nvim_create_namespace("diff_review_notes")
 M.cursor_ns_id = vim.api.nvim_create_namespace("diff_review_note_cursor")
 M.sign_group = "diff_review_notes"
+M.next_sign_id = 1
 
 -- Track which buffers have notes displayed
 M.active_buffers = {}
+
+local function allocate_sign_id()
+  local id = M.next_sign_id
+  M.next_sign_id = M.next_sign_id + 1
+  return id
+end
 
 -- Define signs for notes (reuse comment signs)
 local function define_signs()
@@ -175,7 +182,7 @@ function M.update_display(bufnr, filepath, set_name)
     local sign_name = note.type == "range" and "DiffReviewNoteRange" or "DiffReviewNote"
 
     -- Place sign at the note line
-    local ok, err = pcall(vim.fn.sign_place, note.id, M.sign_group, sign_name, bufnr, {
+    local ok, err = pcall(vim.fn.sign_place, allocate_sign_id(), M.sign_group, sign_name, bufnr, {
       lnum = display_line,
       priority = SIGN_PRIORITY,
     })
@@ -200,7 +207,7 @@ function M.update_display(bufnr, filepath, set_name)
       local range_end = math.min(note.line_range["end"], line_count)
 
       for line = range_start, range_end do
-        local ok, err = pcall(vim.fn.sign_place, note.id * 1000 + line, M.sign_group, sign_name, bufnr, {
+        local ok, err = pcall(vim.fn.sign_place, allocate_sign_id(), M.sign_group, sign_name, bufnr, {
           lnum = line,
           priority = SIGN_PRIORITY,
         })
