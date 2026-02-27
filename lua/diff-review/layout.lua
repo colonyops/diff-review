@@ -357,6 +357,15 @@ function M.setup_keymaps()
   -- Comment actions (visual mode)
   vim.keymap.set("v", opts.keymaps.add_comment, actions.add_comment_for_range, keymap_opts)
 
+  -- Block insert mode in diff pane (buffer is read-only)
+  for _, key in ipairs({ "i", "I", "a", "A", "o", "O", "s", "S", "c", "C", "r", "R" }) do
+    vim.keymap.set("n", key, "<Nop>", keymap_opts)
+  end
+
+  -- File list navigation from diff pane
+  vim.keymap.set("n", opts.keymaps.diff_next_file, require("diff-review.file_list").next_file, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.diff_prev_file, require("diff-review.file_list").prev_file, keymap_opts)
+
   -- File navigation actions
   vim.keymap.set("n", "gf", actions.open_file, keymap_opts)
   vim.keymap.set("n", "<C-w>f", actions.open_file_split, keymap_opts)

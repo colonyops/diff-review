@@ -23,6 +23,9 @@ M.defaults = {
     toggle_fold = "<Tab>",
     open_directory = "o",
     close_directory = "O",
+    -- Diff pane navigation
+    diff_next_file = "<Tab>",
+    diff_prev_file = "<S-Tab>",
     -- Comment keymaps
     add_comment = "<leader>c",
     edit_comment = "<leader>e",
