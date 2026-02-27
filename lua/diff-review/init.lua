@@ -41,7 +41,7 @@ M.setup = function(opts)
     local subcommand = args[1]
 
     -- Known subcommands
-    local subcommands = { close = true, toggle = true, list = true, copy = true, submit = true, health = true }
+    local subcommands = { close = true, toggle = true, list = true, copy = true, submit = true, health = true, clear = true }
 
     -- If no subcommand or not a known subcommand, treat as open command with ref
     if not subcommand or not subcommands[subcommand] then
@@ -141,6 +141,31 @@ M.setup = function(opts)
       )
     elseif subcommand == "submit" then
       require("diff-review.submit").submit_current_review()
+    elseif subcommand == "clear" then
+      local all_comments = require("diff-review.comments").get_all()
+      local count = #all_comments
+      if count == 0 then
+        vim.notify("No comments to clear", vim.log.levels.INFO)
+        return
+      end
+      vim.ui.select(
+        { "Yes", "No" },
+        { prompt = string.format("Clear all %d comment(s) in current review?", count) },
+        function(choice)
+          if choice ~= "Yes" then
+            return
+          end
+          require("diff-review.comments").clear()
+          local layout = require("diff-review.layout")
+          local state = layout.get_state()
+          local ui = require("diff-review.ui")
+          if state.diff_buf and vim.api.nvim_buf_is_valid(state.diff_buf) then
+            ui.clear_comments(state.diff_buf)
+          end
+          require("diff-review.file_list").render()
+          vim.notify(string.format("Cleared %d comment(s)", count), vim.log.levels.INFO)
+        end
+      )
     elseif subcommand == "health" then
       local layout = require("diff-review.layout")
       local state = layout.get_state()
@@ -172,7 +197,7 @@ M.setup = function(opts)
       end
       vim.notify(table.concat(status, "\n"), vim.log.levels.INFO)
     else
-      vim.notify("Unknown subcommand: " .. subcommand .. "\nAvailable: close, toggle, list, copy, submit, health", vim.log.levels.ERROR)
+      vim.notify("Unknown subcommand: " .. subcommand .. "\nAvailable: close, toggle, list, copy, submit, health, clear", vim.log.levels.ERROR)
     end
   end, {
     desc = "Diff review operations",
@@ -182,7 +207,7 @@ M.setup = function(opts)
       if #args <= 2 then
         return vim.tbl_filter(function(cmd)
           return cmd:find(arg_lead, 1, true) == 1
-        end, { "close", "toggle", "list", "copy", "submit", "health" })
+        end, { "close", "toggle", "list", "copy", "submit", "health", "clear" })
       elseif args[2] == "copy" and #args <= 3 then
         return { "comments", "full", "diff" }
       end
@@ -234,6 +259,10 @@ M.setup = function(opts)
   vim.api.nvim_create_user_command("DiffReviewList", function()
     require("diff-review.picker").show()
   end, { desc = "List and switch diff reviews" })
+
+  vim.api.nvim_create_user_command("DiffReviewClear", function()
+    vim.cmd("DiffReview clear")
+  end, { desc = "Clear all comments in the current review" })
 
   vim.api.nvim_create_user_command("DiffNoteToggle", function(opts)
     local args = vim.split(opts.args or "", "%s+", { trimempty = true })
