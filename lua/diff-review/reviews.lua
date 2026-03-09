@@ -40,7 +40,7 @@ local function generate_id(type, base, head, pr_number)
 end
 
 -- Create a new review context
-function M.create(type, base, head, pr_number)
+function M.create(type, base, head, pr_number, separator)
   local id = generate_id(type, base, head, pr_number)
 
   local review = {
@@ -48,6 +48,7 @@ function M.create(type, base, head, pr_number)
     type = type,
     base = base,
     head = head,
+    separator = separator,
     pr_number = pr_number,
     files = {},
     created_at = os.time(),
@@ -59,7 +60,7 @@ function M.create(type, base, head, pr_number)
 end
 
 -- Get or create a review context
-function M.get_or_create(type, base, head, pr_number)
+function M.get_or_create(type, base, head, pr_number, separator)
   local id = generate_id(type, base, head, pr_number)
 
   if M.reviews[id] then
@@ -67,7 +68,7 @@ function M.get_or_create(type, base, head, pr_number)
     return M.reviews[id]
   end
 
-  return M.create(type, base, head, pr_number)
+  return M.create(type, base, head, pr_number, separator)
 end
 
 -- Get a review by ID

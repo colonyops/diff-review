@@ -58,7 +58,8 @@ M.setup = function(opts)
           parsed.type,
           parsed.base,
           parsed.head,
-          parsed.pr_number
+          parsed.pr_number,
+          parsed.separator
         )
       end
 

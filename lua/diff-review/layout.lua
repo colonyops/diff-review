@@ -75,7 +75,7 @@ local function get_window_config()
 end
 
 -- Open the diff review layout
-function M.open(review_type, base, head, pr_number)
+function M.open(review_type, base, head, pr_number, separator)
   if M.state.is_open then
     return
   end
@@ -95,7 +95,8 @@ function M.open(review_type, base, head, pr_number)
     review_type or "uncommitted",
     base,
     head,
-    pr_number
+    pr_number,
+    separator
   )
   reviews.set_current(review)
 

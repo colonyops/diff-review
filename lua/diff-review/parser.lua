@@ -28,12 +28,13 @@ function M.parse_args(args)
   end
 
   -- Check for range syntax: base..head or base...head
-  local base, head = args:match("^(.+)%.%.%.?(.+)$")
+  local base, sep, head = args:match("^(.+)(%.%.%.?)(.+)$")
   if base and head then
     return {
       type = "range",
       base = base,
       head = head,
+      separator = sep,
       pr_number = nil,
     }
   end

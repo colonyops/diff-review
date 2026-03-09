@@ -187,9 +187,9 @@ function M.get_file_stats()
   local args = { "diff", "--numstat" }
 
   if review and review.type == "ref" then
-    table.insert(args, review.base .. "..HEAD")
+    table.insert(args, review.base .. "...HEAD")
   elseif review and review.type == "range" then
-    table.insert(args, review.base .. ".." .. review.head)
+    table.insert(args, review.base .. (review.separator or "..") .. review.head)
   end
 
   local output, err = exec_git(args)
@@ -267,9 +267,9 @@ function M.get_changed_files()
   local args = { "diff", "--name-status" }
 
   if review.type == "ref" then
-    table.insert(args, review.base .. "..HEAD")
+    table.insert(args, review.base .. "...HEAD")
   elseif review.type == "range" then
-    table.insert(args, review.base .. ".." .. review.head)
+    table.insert(args, review.base .. (review.separator or "..") .. review.head)
   end
 
   local output, err = exec_git(args)
@@ -324,9 +324,9 @@ function M.get_file_diff(file)
 
   -- Add review context
   if review and review.type == "ref" then
-    table.insert(args, review.base .. "..HEAD")
+    table.insert(args, review.base .. "...HEAD")
   elseif review and review.type == "range" then
-    table.insert(args, review.base .. ".." .. review.head)
+    table.insert(args, review.base .. (review.separator or "..") .. review.head)
   end
 
   -- Add file path
