@@ -158,7 +158,6 @@ local function get_stats_header_lines()
 
   return {
     stats_line,
-    opts.ui.stats_header.separator,
   }
 end
 
