@@ -5,10 +5,16 @@ local config = require("diff-review.config")
 -- Module-level line mapping cache
 M._line_mapping = nil
 M._line_num_width = 4  -- Width for formatting line numbers
+M._comment_lines = {}  -- Set of line numbers that have comments (for statuscolumn highlighting)
 
 -- Statuscolumn function for diff line numbers
 -- Shows old and new file line numbers instead of buffer line numbers
 function M.statuscolumn()
+  -- Hide line numbers on virtual lines (comment text, etc.)
+  if vim.v.virtnum ~= 0 then
+    return ""
+  end
+
   local lnum = vim.v.lnum
   if not M._line_mapping then
     return ""
@@ -21,13 +27,14 @@ function M.statuscolumn()
 
   local w = M._line_num_width
   local pad = string.rep(" ", w)
+  local hl = M._comment_lines[lnum] and "DiffReviewCommentGutter" or "LineNr"
 
   if entry.type == "context" then
-    return string.format("%%#LineNr#%" .. w .. "d %" .. w .. "d%%#NonText#│%%*", entry.old_line, entry.new_line)
+    return string.format("%%#" .. hl .. "#%" .. w .. "d %" .. w .. "d %%*", entry.old_line, entry.new_line)
   elseif entry.type == "add" then
-    return string.format("%%#LineNr#%s %" .. w .. "d%%#NonText#│%%*", pad, entry.new_line)
+    return string.format("%%#" .. hl .. "#%s %" .. w .. "d %%*", pad, entry.new_line)
   elseif entry.type == "delete" then
-    return string.format("%%#LineNr#%" .. w .. "d %s%%#NonText#│%%*", entry.old_line, pad)
+    return string.format("%%#" .. hl .. "#%" .. w .. "d %s %%*", entry.old_line, pad)
   end
 
   return ""
@@ -400,11 +407,18 @@ local function build_line_mapping(diff_output)
   local display_line = 1
   local new_file_line = 0
   local old_file_line = 0
+  local seen_hunk = false
 
   for line in diff_output:gmatch("[^\r\n]+") do
     -- Match hunk header: @@ -start,count +start,count @@
     local old_start, old_count, new_start, new_count = line:match("^@@ %-(%d+),?(%d*) %+(%d+),?(%d*) @@")
     if old_start then
+      -- Add separator line before hunk headers (except the first)
+      if seen_hunk then
+        mapping[display_line] = { type = "separator", file_line = nil }
+        display_line = display_line + 1
+      end
+      seen_hunk = true
       -- Hunk header line
       new_file_line = tonumber(new_start)
       old_file_line = tonumber(old_start)
@@ -532,7 +546,8 @@ end
 -- Parse diff and extract clean code with line metadata
 local function parse_diff_with_syntax(diff_output)
   local lines = {}
-  local line_types = {} -- "add", "delete", "context", "header"
+  local line_types = {} -- "add", "delete", "context", "header", "separator"
+  local seen_hunk = false
 
   for line in diff_output:gmatch("[^\r\n]+") do
     local prefix = line:sub(1, 1)
@@ -548,8 +563,17 @@ local function parse_diff_with_syntax(diff_output)
       -- Context line - strip the space prefix
       table.insert(lines, line:sub(2))
       table.insert(line_types, "context")
-    elseif line:match("^@@") or line:match("^diff ") or line:match("^index ") then
-      -- Hunk header or diff metadata
+    elseif line:match("^@@") then
+      -- Add blank separator line before hunk headers (except the first)
+      if seen_hunk then
+        table.insert(lines, "")
+        table.insert(line_types, "separator")
+      end
+      seen_hunk = true
+      table.insert(lines, line)
+      table.insert(line_types, "header")
+    elseif line:match("^diff ") or line:match("^index ") then
+      -- Diff metadata
       table.insert(lines, line)
       table.insert(line_types, "header")
     else

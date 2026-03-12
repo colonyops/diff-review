@@ -55,6 +55,13 @@ end
 
 -- Set up buffer-local keymaps
 local function setup_buffer_keymaps(bufnr)
+  -- Skip diff review buffers — they have their own comment keymaps
+  local layout = require("diff-review.layout")
+  local state = layout.get_state()
+  if state.is_open and (bufnr == state.diff_buf or bufnr == state.file_list_buf) then
+    return
+  end
+
   local opts = config.get()
   if not opts or not opts.keymaps then
     return -- Config not initialized, skip keymap setup

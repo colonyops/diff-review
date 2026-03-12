@@ -415,7 +415,7 @@ function M.setup_keymaps()
   vim.keymap.set("v", opts.keymaps.add_comment, actions.add_comment_for_range, keymap_opts)
 
   -- Block insert mode in diff pane (buffer is read-only)
-  for _, key in ipairs({ "i", "I", "a", "A", "o", "O", "s", "S", "c", "C", "r", "R" }) do
+  for _, key in ipairs({ "i", "I", "a", "A", "o", "O", "s", "S", "r", "R" }) do
     vim.keymap.set("n", key, "<Nop>", keymap_opts)
   end
 

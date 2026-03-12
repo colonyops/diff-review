@@ -15,12 +15,28 @@ M.modes = {
 	DIFF = "diff",
 }
 
+-- Resolve a buffer line to a file line number using the diff line mapping
+local function resolve_file_line(buf_line)
+	local diff = require("diff-review.diff")
+	if not diff._line_mapping then
+		return buf_line
+	end
+	local entry = diff._line_mapping[buf_line]
+	if not entry then
+		return buf_line
+	end
+	return entry.new_line or entry.old_line or buf_line
+end
+
 -- Format comment with line information
 local function format_comment_line(comment)
 	if comment.type == "range" then
-		return string.format("- Lines %d-%d: %s", comment.line_range.start, comment.line_range["end"], comment.text)
+		local start_line = resolve_file_line(comment.line_range.start)
+		local end_line = resolve_file_line(comment.line_range["end"])
+		return string.format("- Lines %d-%d: %s", start_line, end_line, comment.text)
 	else
-		return string.format("- Line %d: %s", comment.line, comment.text)
+		local file_line = resolve_file_line(comment.line)
+		return string.format("- Line %d: %s", file_line, comment.text)
 	end
 end
 
@@ -94,26 +110,34 @@ local function build_diff_line_map(diff_output)
 	local idx = 0
 	local old_line = nil
 	local new_line = nil
+	local seen_hunk = false
 
 	for line in diff_output:gmatch("[^\r\n]+") do
-		idx = idx + 1
-
 		local old_start, new_start = line:match("^@@ %-(%d+),?%d* %+(%d+),?%d* @@")
 		if old_start and new_start then
+			-- Account for separator line before hunks (except the first)
+			if seen_hunk then
+				idx = idx + 1
+			end
+			seen_hunk = true
+			idx = idx + 1
 			old_line = tonumber(old_start)
 			new_line = tonumber(new_start)
-		elseif old_line and new_line then
-			local prefix = line:sub(1, 1)
-			if prefix == "+" then
-				line_map[idx] = new_line
-				new_line = new_line + 1
-			elseif prefix == "-" then
-				line_map[idx] = nil
-				old_line = old_line + 1
-			elseif prefix == " " then
-				line_map[idx] = new_line
-				old_line = old_line + 1
-				new_line = new_line + 1
+		else
+			idx = idx + 1
+			if old_line and new_line then
+				local prefix = line:sub(1, 1)
+				if prefix == "+" then
+					line_map[idx] = new_line
+					new_line = new_line + 1
+				elseif prefix == "-" then
+					line_map[idx] = nil
+					old_line = old_line + 1
+				elseif prefix == " " then
+					line_map[idx] = new_line
+					old_line = old_line + 1
+					new_line = new_line + 1
+				end
 			end
 		end
 	end
@@ -311,7 +335,7 @@ function M.export_full()
 			table.insert(lines, "")
 
 			-- Add comment text
-			table.insert(lines, string.format("💬 %s", comment.text))
+			table.insert(lines, string.format("%s", comment.text))
 			table.insert(lines, "")
 			table.insert(lines, "---")
 			table.insert(lines, "")
@@ -373,11 +397,21 @@ function M.export_annotated_diff()
 			end)
 
 			-- Parse diff and insert comments
+			-- Buffer lines include separator lines before hunks (except the first),
+			-- so track a buffer_line that accounts for those offsets
 			local comment_idx = 1
-			local diff_line_idx = 0
+			local buffer_line = 0
+			local seen_hunk_in_export = false
 
 			for line in diff_output:gmatch("[^\r\n]+") do
-				diff_line_idx = diff_line_idx + 1
+				local is_hunk = line:match("^@@") ~= nil
+				if is_hunk and seen_hunk_in_export then
+					buffer_line = buffer_line + 1 -- separator line
+				end
+				if is_hunk then
+					seen_hunk_in_export = true
+				end
+				buffer_line = buffer_line + 1
 
 				-- Add the diff line
 				table.insert(output_lines, line)
@@ -387,9 +421,9 @@ function M.export_annotated_diff()
 					local comment = file_comments[comment_idx]
 					local comment_line = comment.type == "range" and comment.line_range.start or comment.line
 
-					if diff_line_idx == comment_line then
+					if buffer_line == comment_line then
 						-- Insert comment as a special annotation line
-						table.insert(output_lines, string.format("+    // 💬 %s", comment.text))
+						table.insert(output_lines, string.format("+    // %s", comment.text))
 						comment_idx = comment_idx + 1
 					else
 						break

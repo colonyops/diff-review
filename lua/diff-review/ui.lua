@@ -133,6 +133,19 @@ local function wrap_line(line, max_width, indent)
   return wrapped
 end
 
+-- Resolve a buffer line to a file line number using the diff line mapping
+local function resolve_file_line(buf_line)
+  local diff = require("diff-review.diff")
+  if not diff._line_mapping then
+    return buf_line
+  end
+  local entry = diff._line_mapping[buf_line]
+  if not entry then
+    return buf_line
+  end
+  return entry.new_line or entry.old_line or buf_line
+end
+
 -- Format comment text for display
 local function format_comment_text(comment)
   local opts = config.get()
@@ -143,9 +156,9 @@ local function format_comment_text(comment)
   -- Add line range header
   local line_info
   if comment.type == "range" and comment.line_range then
-    line_info = string.format("  L%d-L%d", comment.line_range.start, comment.line_range["end"])
+    line_info = string.format("  L%d-L%d", resolve_file_line(comment.line_range.start), resolve_file_line(comment.line_range["end"]))
   else
-    line_info = string.format("  L%d", comment.line)
+    line_info = string.format("  L%d", resolve_file_line(comment.line))
   end
   table.insert(formatted, line_info)
 
@@ -175,7 +188,14 @@ function M.update_comment_display()
     return
   end
 
+  -- Only apply comment line highlights if user configured one,
+  -- otherwise the empty highlight overrides diff add/delete colors
+  local opts = config.get()
+  local has_comment_line_hl = opts.ui.comment_line_hl ~= nil
+
   -- Clear existing comments
+  local diff = require("diff-review.diff")
+  diff._comment_lines = {}
   M.clear_comments(state.diff_buf)
 
   -- Get current file
@@ -252,28 +272,34 @@ function M.update_comment_display()
       table.insert(virtual_by_line[virt_display_line], comment)
     end
 
-    -- If it's a range comment, place signs on all lines in range
+    -- Mark lines for statuscolumn highlighting and place range signs
     if comment.type == "range" and comment.line_range then
       local range_start = math.max(comment.line_range.start, 1)
       local range_end = math.min(comment.line_range["end"], line_count)
 
       for line = range_start, range_end do
+        diff._comment_lines[line] = true
         pcall(vim.fn.sign_place, comment.id * 1000 + line, M.sign_group, sign_name, state.diff_buf, {
           lnum = line,
           priority = 10,
         })
-        pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, line - 1, 0, {
+        if has_comment_line_hl then
+          pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, line - 1, 0, {
+            linehl = "DiffReviewCommentLine",
+            hl_mode = "combine",
+            priority = 200,
+          })
+        end
+      end
+    else
+      diff._comment_lines[display_line] = true
+      if has_comment_line_hl then
+        pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, display_line - 1, 0, {
           linehl = "DiffReviewCommentLine",
           hl_mode = "combine",
           priority = 200,
         })
       end
-    else
-      pcall(vim.api.nvim_buf_set_extmark, state.diff_buf, M.ns_id, display_line - 1, 0, {
-        linehl = "DiffReviewCommentLine",
-        hl_mode = "combine",
-        priority = 200,
-      })
     end
 
     placed_count = placed_count + 1

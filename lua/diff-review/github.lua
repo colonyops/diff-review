@@ -85,11 +85,40 @@ function M.get_pr_files(pr_number)
   return data.files, nil
 end
 
+-- Convert a buffer line to its raw diff line index, accounting for
+-- separator lines inserted between hunks in the display buffer.
+local function buffer_to_raw_line(file_diff, buffer_line)
+  local raw_idx = 0
+  local buf_idx = 0
+  local seen_hunk = false
+
+  for line in file_diff:gmatch("[^\r\n]+") do
+    raw_idx = raw_idx + 1
+    if line:match("^@@") then
+      if seen_hunk then
+        buf_idx = buf_idx + 1 -- separator line
+      end
+      seen_hunk = true
+    end
+    buf_idx = buf_idx + 1
+    if buf_idx == buffer_line then
+      return raw_idx
+    end
+  end
+  return nil
+end
+
 function M.get_diff_position(file_diff, buffer_line)
   if not file_diff or buffer_line < 1 then
     return nil
   end
 
+  local raw_line = buffer_to_raw_line(file_diff, buffer_line)
+  if not raw_line then
+    return nil
+  end
+
+  -- Find the first hunk header in raw diff lines
   local idx = 0
   local patch_start = nil
   for line in file_diff:gmatch("[^\r\n]+") do
@@ -99,11 +128,11 @@ function M.get_diff_position(file_diff, buffer_line)
     end
   end
 
-  if not patch_start or buffer_line < patch_start then
+  if not patch_start or raw_line < patch_start then
     return nil
   end
 
-  return buffer_line - patch_start + 1
+  return raw_line - patch_start + 1
 end
 
 function M.format_single_comment(comment, file_diff)
@@ -120,6 +149,11 @@ function M.format_single_comment(comment, file_diff)
 end
 
 local function get_line_info(file_diff, buffer_line)
+  local raw_target = buffer_to_raw_line(file_diff, buffer_line)
+  if not raw_target then
+    return nil
+  end
+
   local idx = 0
   local old_line = nil
   local new_line = nil
@@ -132,7 +166,7 @@ local function get_line_info(file_diff, buffer_line)
       old_line = tonumber(old_start)
       new_line = tonumber(new_start)
     elseif old_line and new_line then
-      if idx == buffer_line then
+      if idx == raw_target then
         local prefix = line:sub(1, 1)
         if prefix == "+" then
           return { side = "RIGHT", line = new_line }
