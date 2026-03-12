@@ -26,6 +26,11 @@ M.defaults = {
     -- Diff pane navigation
     diff_next_file = "<Tab>",
     diff_prev_file = "<S-Tab>",
+    -- File navigation
+    open_file = "gf",
+    open_file_split = "<C-w>f",
+    open_file_vsplit = "<C-w>gf",
+    return_to_review = "gr",
     -- Comment keymaps
     add_comment = "<leader>c",
     edit_comment = "<leader>e",

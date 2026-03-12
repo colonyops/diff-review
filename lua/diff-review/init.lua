@@ -225,6 +225,13 @@ M.setup = function(opts)
     require("diff-review.layout").close()
   end, { desc = "Close diff review window" })
 
+  vim.api.nvim_create_user_command("DiffReviewReturn", function()
+    local layout = require("diff-review.layout")
+    if not layout.focus_review() then
+      vim.notify("No active review to return to", vim.log.levels.INFO)
+    end
+  end, { desc = "Return to diff review from file view" })
+
   vim.api.nvim_create_user_command("DiffReviewCopy", function(opts)
     local args = vim.split(opts.args or "", "%s+", { trimempty = true })
     local export = require("diff-review.export")

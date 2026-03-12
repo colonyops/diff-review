@@ -10,6 +10,8 @@ M.state = {
   diff_win = nil,
   diff_buf = nil,
   original_win = nil,
+  original_tab = nil,
+  review_tab = nil,
 }
 
 -- Last review state for restoration
@@ -100,8 +102,9 @@ function M.open(review_type, base, head, pr_number, separator)
   )
   reviews.set_current(review)
 
-  -- Save current window
+  -- Save current window and tab
   M.state.original_win = vim.api.nvim_get_current_win()
+  M.state.original_tab = vim.api.nvim_get_current_tabpage()
 
   -- Create buffers
   M.state.file_list_buf = create_scratch_buffer("DiffReview://file_list")
@@ -112,6 +115,7 @@ function M.open(review_type, base, head, pr_number, separator)
 
   -- Create a new tab
   vim.cmd("tabnew")
+  M.state.review_tab = vim.api.nvim_get_current_tabpage()
   local main_win = vim.api.nvim_get_current_win()
 
   -- Create file list window (left)
@@ -240,6 +244,8 @@ function M.close()
   M.state.diff_win = nil
   M.state.diff_buf = nil
   M.state.original_win = nil
+  M.state.original_tab = nil
+  M.state.review_tab = nil
 end
 
 -- Restore previous review session
@@ -319,6 +325,53 @@ function M.toggle()
   end
 end
 
+-- Focus the review tab (switch to it without closing anything)
+function M.focus_review()
+  if not M.state.is_open then
+    return false
+  end
+
+  if M.state.review_tab and vim.api.nvim_tabpage_is_valid(M.state.review_tab) then
+    vim.api.nvim_set_current_tabpage(M.state.review_tab)
+    -- Focus the diff window if valid
+    if M.state.diff_win and vim.api.nvim_win_is_valid(M.state.diff_win) then
+      vim.api.nvim_set_current_win(M.state.diff_win)
+    end
+    return true
+  end
+
+  return false
+end
+
+-- Open a file in the original tab without closing the review
+-- Returns true if successful
+function M.open_file_in_original_tab(filepath, line_num)
+  if not M.state.is_open then
+    return false
+  end
+
+  -- Switch to the original tab
+  if M.state.original_tab and vim.api.nvim_tabpage_is_valid(M.state.original_tab) then
+    vim.api.nvim_set_current_tabpage(M.state.original_tab)
+  end
+
+  -- If original window is valid, focus it
+  if M.state.original_win and vim.api.nvim_win_is_valid(M.state.original_win) then
+    vim.api.nvim_set_current_win(M.state.original_win)
+  end
+
+  -- Open the file
+  vim.cmd("edit " .. vim.fn.fnameescape(filepath))
+
+  -- Jump to line and center
+  if line_num and line_num > 0 then
+    vim.api.nvim_win_set_cursor(0, { line_num, 0 })
+    vim.cmd("normal! zz")
+  end
+
+  return true
+end
+
 -- Setup keymaps for the windows
 function M.setup_keymaps()
   local opts = config.get()
@@ -368,9 +421,10 @@ function M.setup_keymaps()
   vim.keymap.set("n", opts.keymaps.diff_prev_file, require("diff-review.file_list").prev_file, keymap_opts)
 
   -- File navigation actions
-  vim.keymap.set("n", "gf", actions.open_file, keymap_opts)
-  vim.keymap.set("n", "<C-w>f", actions.open_file_split, keymap_opts)
-  vim.keymap.set("n", "<C-w>gf", actions.open_file_vsplit, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.open_file, actions.open_file, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.open_file_split, actions.open_file_split, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.open_file_vsplit, actions.open_file_vsplit, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.return_to_review, actions.return_to_review, keymap_opts)
 end
 
 -- Get current state
