@@ -96,6 +96,7 @@ M.defaults = {
     context_lines = 3,     -- Lines of context around changes
     ignore_whitespace = false,
     syntax_highlighting = true,
+    highlight_blend = 0.60, -- Blend diff backgrounds toward Normal bg (0.0 = full color, 1.0 = invisible)
   },
 
   -- Persistence options

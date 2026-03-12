@@ -59,6 +59,52 @@ local function set_comment_line_highlight()
   end
 end
 
+-- Blend a color toward a base color by a given factor (0.0 = full color, 1.0 = full base)
+local function blend(color, base, factor)
+  local r1 = math.floor(color / 0x10000)
+  local g1 = math.floor((color % 0x10000) / 0x100)
+  local b1 = color % 0x100
+  local r2 = math.floor(base / 0x10000)
+  local g2 = math.floor((base % 0x10000) / 0x100)
+  local b2 = base % 0x100
+  local r = math.floor(r1 + (r2 - r1) * factor)
+  local g = math.floor(g1 + (g2 - g1) * factor)
+  local b = math.floor(b1 + (b2 - b1) * factor)
+  return r * 0x10000 + g * 0x100 + b
+end
+
+-- Get the normal background color
+local function get_normal_bg()
+  local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = "Normal", link = false })
+  if ok and hl and hl.bg then
+    return hl.bg
+  end
+  return 0x1e1e2e -- fallback dark bg
+end
+
+-- Create subtle diff highlight groups by blending theme colors with the background
+local function define_diff_highlights()
+  local bg = get_normal_bg()
+  local opts = config.get()
+  local blend_factor = opts.diff and opts.diff.highlight_blend or 0.60
+
+  -- Get DiffAdd bg color
+  local ok_add, add_hl = pcall(vim.api.nvim_get_hl, 0, { name = "DiffAdd", link = false })
+  if ok_add and add_hl and add_hl.bg then
+    vim.api.nvim_set_hl(0, "DiffReviewAdd", { bg = blend(add_hl.bg, bg, blend_factor) })
+  else
+    vim.api.nvim_set_hl(0, "DiffReviewAdd", { bg = blend(0x2e7d32, bg, blend_factor) })
+  end
+
+  -- Get DiffDelete bg color
+  local ok_del, del_hl = pcall(vim.api.nvim_get_hl, 0, { name = "DiffDelete", link = false })
+  if ok_del and del_hl and del_hl.bg then
+    vim.api.nvim_set_hl(0, "DiffReviewDelete", { bg = blend(del_hl.bg, bg, blend_factor) })
+  else
+    vim.api.nvim_set_hl(0, "DiffReviewDelete", { bg = blend(0xc62828, bg, blend_factor) })
+  end
+end
+
 -- Initialize UI
 function M.init()
   define_signs()
@@ -78,6 +124,17 @@ function M.init()
 
   -- Define renamed file highlight (cyan-ish)
   vim.api.nvim_set_hl(0, "DiffReviewRenamed", { link = "Function" })
+
+  -- Define subtle diff line highlights
+  define_diff_highlights()
+
+  -- Re-define highlights when colorscheme changes
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    group = vim.api.nvim_create_augroup("DiffReviewHighlights", { clear = true }),
+    callback = function()
+      define_diff_highlights()
+    end,
+  })
 end
 
 -- Clear all comment UI for a buffer

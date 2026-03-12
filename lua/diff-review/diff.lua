@@ -596,15 +596,13 @@ local function apply_diff_highlights(buf, line_types)
   -- Apply line highlights for each line
   for i, line_type in ipairs(line_types) do
     if line_type == "add" then
-      -- Green background for added lines
       vim.api.nvim_buf_set_extmark(buf, ns_id, i - 1, 0, {
-        line_hl_group = "DiffAdd",
+        line_hl_group = "DiffReviewAdd",
         priority = 100,
       })
     elseif line_type == "delete" then
-      -- Red background for deleted lines
       vim.api.nvim_buf_set_extmark(buf, ns_id, i - 1, 0, {
-        line_hl_group = "DiffDelete",
+        line_hl_group = "DiffReviewDelete",
         priority = 100,
       })
     end
