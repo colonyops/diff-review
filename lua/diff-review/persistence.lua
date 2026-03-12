@@ -32,16 +32,17 @@ local function get_storage_path(context_id)
   return string.format("%s/%s.json", dir, context_id or "default")
 end
 
--- Save comments to JSON
-function M.save(comments, context_id)
+-- Save comments and reviewed files to JSON
+function M.save(comments, context_id, reviewed_files)
   local path = get_storage_path(context_id)
 
   -- Convert comments to JSON-serializable format
   local data = {
-    version = 1,
+    version = 2,
     context_id = context_id or "default",
     saved_at = os.time(),
     comments = comments,
+    reviewed_files = reviewed_files or {},
   }
 
   local json = vim.fn.json_encode(data)
@@ -59,20 +60,21 @@ function M.save(comments, context_id)
   return true
 end
 
--- Load comments from JSON
+-- Load comments and reviewed files from JSON
+-- Returns comments, reviewed_files
 function M.load(context_id)
   local path = get_storage_path(context_id)
 
   -- Check if file exists
   if vim.fn.filereadable(path) == 0 then
-    return nil
+    return nil, nil
   end
 
   -- Read file
   local file = io.open(path, "r")
   if not file then
     vim.notify("Failed to load comments: " .. path, vim.log.levels.ERROR)
-    return nil
+    return nil, nil
   end
 
   local content = file:read("*a")
@@ -82,10 +84,10 @@ function M.load(context_id)
   local ok, data = pcall(vim.fn.json_decode, content)
   if not ok or not data then
     vim.notify("Failed to parse comments file: " .. path, vim.log.levels.ERROR)
-    return nil
+    return nil, nil
   end
 
-  return data.comments
+  return data.comments, data.reviewed_files
 end
 
 -- Delete saved comments
@@ -119,19 +121,21 @@ function M.list_contexts()
   return contexts
 end
 
--- Auto-save comments
-function M.auto_save(comments, context_id)
-  -- Only auto-save if there are comments
-  if #comments == 0 then
+-- Auto-save comments and reviewed files
+function M.auto_save(comments, context_id, reviewed_files)
+  -- Only auto-save if there's data worth saving
+  if #comments == 0 and (not reviewed_files or #reviewed_files == 0) then
     return
   end
 
-  M.save(comments, context_id)
+  M.save(comments, context_id, reviewed_files)
 end
 
--- Auto-load comments
+-- Auto-load comments and reviewed files
+-- Returns comments, reviewed_files
 function M.auto_load(context_id)
-  return M.load(context_id) or {}
+  local comments, reviewed_files = M.load(context_id)
+  return comments or {}, reviewed_files
 end
 
 -- Get storage directory path

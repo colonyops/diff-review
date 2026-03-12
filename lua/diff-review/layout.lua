@@ -387,6 +387,7 @@ function M.setup_keymaps()
   vim.keymap.set("n", opts.keymaps.open_directory, require("diff-review.file_list").open_fold, keymap_opts)
   vim.keymap.set("n", opts.keymaps.close_directory, require("diff-review.file_list").close_fold, keymap_opts)
   vim.keymap.set("n", "<leader>t", require("diff-review.file_list").toggle_view_mode, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.toggle_reviewed, require("diff-review.file_list").toggle_reviewed, keymap_opts)
 
   -- Track cursor movement to sync selection
   vim.api.nvim_create_autocmd("CursorMoved", {
@@ -416,9 +417,10 @@ function M.setup_keymaps()
     vim.keymap.set("n", key, "<Nop>", keymap_opts)
   end
 
-  -- File list navigation from diff pane
+  -- File list navigation and review tracking from diff pane
   vim.keymap.set("n", opts.keymaps.diff_next_file, require("diff-review.file_list").next_file, keymap_opts)
   vim.keymap.set("n", opts.keymaps.diff_prev_file, require("diff-review.file_list").prev_file, keymap_opts)
+  vim.keymap.set("n", opts.keymaps.toggle_reviewed, require("diff-review.file_list").toggle_reviewed, keymap_opts)
 
   -- File navigation actions
   vim.keymap.set("n", opts.keymaps.open_file, actions.open_file, keymap_opts)

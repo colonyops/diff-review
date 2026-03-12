@@ -91,8 +91,8 @@ function M.set_current(review)
 
   M.current_review = review
 
-  -- Load comments for this review
-  local loaded_comments = persistence.auto_load(review.id)
+  -- Load comments and reviewed files for this review
+  local loaded_comments, reviewed_files = persistence.auto_load(review.id)
   if loaded_comments and #loaded_comments > 0 then
     comments.comments = loaded_comments
     comments.next_id = 1
@@ -105,6 +105,10 @@ function M.set_current(review)
   else
     comments.clear()
   end
+
+  -- Restore reviewed files
+  local file_list = require("diff-review.file_list")
+  file_list.set_reviewed_files(reviewed_files)
 end
 
 -- Get current review
@@ -112,13 +116,14 @@ function M.get_current()
   return M.current_review
 end
 
--- Save current review comments
+-- Save current review comments and reviewed files
 function M.save_current()
   if not M.current_review then
     return false
   end
 
-  return persistence.auto_save(comments.get_all(), M.current_review.id)
+  local file_list = require("diff-review.file_list")
+  return persistence.auto_save(comments.get_all(), M.current_review.id, file_list.get_reviewed_files())
 end
 
 -- List all reviews

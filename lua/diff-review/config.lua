@@ -26,6 +26,8 @@ M.defaults = {
     -- Diff pane navigation
     diff_next_file = "<Tab>",
     diff_prev_file = "<S-Tab>",
+    -- Review tracking
+    toggle_reviewed = "x",
     -- File navigation
     open_file = "gf",
     open_file_split = "<C-w>f",

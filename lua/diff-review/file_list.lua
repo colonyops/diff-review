@@ -16,6 +16,7 @@ M.state = {
   view_mode = (config.get().file_list and config.get().file_list.view_mode) or "tree",  -- "flat" or "tree"
   tree = nil,  -- Tree structure for tree view
   flat_tree = nil,  -- Flattened tree for rendering
+  reviewed = {},  -- Set of file paths marked as reviewed
 }
 
 -- Timers for debouncing rapid navigation
@@ -148,17 +149,12 @@ local function get_stats_header_lines()
   if total_added > 0 then table.insert(file_parts, string.format("%dA", total_added)) end
   local file_str = table.concat(file_parts, " ")
 
-  -- Get file icon if available
-  local icon_str = ""
-  if opts.ui.show_icons and devicons then
-    local icon = devicons.get_icon("file", "", { default = true })
-    if icon then
-      icon_str = icon .. " "
-    end
-  end
+  -- Get reviewed progress
+  local reviewed, total_files_count = M.get_progress()
+  local progress_str = string.format("%d/%d", reviewed, total_files_count)
 
-  local stats_line = string.format("  %s | %s%s | +%d -%d",
-    review_type, icon_str, file_str, total_additions, total_deletions)
+  local stats_line = string.format("  %s | %s | +%d -%d | %s",
+    review_type, file_str, total_additions, total_deletions, progress_str)
 
   return {
     stats_line,
@@ -205,6 +201,21 @@ local function apply_stats_header_highlights(highlights, lines)
         end_col = end_col,
         hl_group = "DiffDelete",
       })
+    end
+
+    -- Highlight review progress (N/N at end of line)
+    local progress_pos = line:find("%d+/%d+%s*$")
+    if progress_pos then
+      local reviewed_count, total_count = line:match("(%d+)/(%d+)%s*$")
+      if reviewed_count and total_count then
+        local hl = (reviewed_count == total_count) and "DiagnosticOk" or "DiagnosticInfo"
+        table.insert(highlights, {
+          line = line_idx,
+          col = progress_pos - 1,
+          end_col = #line,
+          hl_group = hl,
+        })
+      end
     end
   end
 end
@@ -331,8 +342,13 @@ local function render_tree_view(state, lines, highlights)
       local file = node.file_data
       local status_info = get_status_icons()[file.status] or { icon = "?", hl = "Normal" }
 
+      local is_reviewed = M.state.reviewed[file.path]
+
       -- Selection indicator
       prefix = (index == M.state.current_index) and "> " or "  "
+
+      -- Reviewed indicator
+      local reviewed_part = is_reviewed and "✓ " or ""
 
       -- Get file icon
       local file_icon, icon_color = get_file_icon(file.path)
@@ -357,10 +373,21 @@ local function render_tree_view(state, lines, highlights)
         end
       end
 
-      local line = string.format("%s%s%s %s%s%s%s", prefix, tree_prefix, status_info.icon, icon_part, node.name, stats_part, comment_part)
+      local line = string.format("%s%s%s%s %s%s%s%s", prefix, tree_prefix, reviewed_part, status_info.icon, icon_part, node.name, stats_part, comment_part)
       table.insert(lines, line)
 
       local col = #prefix + #tree_prefix
+
+      -- Highlight reviewed indicator
+      if is_reviewed then
+        table.insert(highlights, {
+          line = #lines - 1,
+          col = col,
+          end_col = col + #reviewed_part,
+          hl_group = "DiagnosticOk",
+        })
+        col = col + #reviewed_part
+      end
 
       -- Highlight status icon
       table.insert(highlights, {
@@ -385,8 +412,18 @@ local function render_tree_view(state, lines, highlights)
         })
       end
 
+      -- Dim reviewed files (apply after icon highlights so it takes precedence on text)
+      if is_reviewed and index ~= M.state.current_index then
+        table.insert(highlights, {
+          line = #lines - 1,
+          col = #prefix + #tree_prefix + #reviewed_part + #status_info.icon + 1,
+          end_col = -1,
+          hl_group = "Comment",
+        })
+      end
+
       -- Highlight stats
-      if stats_part ~= "" then
+      if stats_part ~= "" and not is_reviewed then
         local stats_col = #line - #comment_part - #stats_part
 
         if stats and stats.additions > 0 then
@@ -417,7 +454,7 @@ local function render_tree_view(state, lines, highlights)
       end
 
       -- Highlight comment count
-      if comment_count > 0 then
+      if comment_count > 0 and not is_reviewed then
         local comment_col = #line - #comment_part
         table.insert(highlights, {
           line = #lines - 1,
@@ -489,7 +526,9 @@ function M.render()
 
     for i, file in ipairs(M.state.files) do
       local status_info = get_status_icons()[file.status] or { icon = "?", hl = "Normal" }
+      local is_reviewed = M.state.reviewed[file.path]
       local prefix = (i == M.state.current_index) and "> " or "  "
+      local reviewed_part = is_reviewed and "✓ " or ""
 
       -- Get file icon if available
       local file_icon, icon_color = get_file_icon(file.path)
@@ -515,24 +554,34 @@ function M.render()
         end
       end
 
-      local line = string.format("%s%s %s%s%s%s", prefix, status_info.icon, icon_part, file.path, stats_part, comment_part)
+      local line = string.format("%s%s%s %s%s%s%s", prefix, reviewed_part, status_info.icon, icon_part, file.path, stats_part, comment_part)
       table.insert(lines, line)
 
       local col = #prefix
 
+      -- Highlight reviewed indicator
+      if is_reviewed then
+        table.insert(highlights, {
+          line = #lines - 1,
+          col = col,
+          end_col = col + #reviewed_part,
+          hl_group = "DiagnosticOk",
+        })
+        col = col + #reviewed_part
+      end
+
       -- Highlight status icon
       table.insert(highlights, {
-        line = #lines - 1,  -- 0-indexed
+        line = #lines - 1,
         col = col,
         end_col = col + #status_info.icon,
         hl_group = status_info.hl,
       })
 
-      col = col + #status_info.icon + 1  -- Move past status icon and space
+      col = col + #status_info.icon + 1
 
       -- Highlight file icon if present
       if file_icon then
-        -- Create a dynamic highlight group for the icon color
         if icon_color then
           local hl_group = "DevIcon_" .. file.path:gsub("[^%w]", "_")
           vim.api.nvim_set_hl(0, hl_group, { fg = icon_color })
@@ -546,12 +595,20 @@ function M.render()
         end
       end
 
+      -- Dim reviewed files
+      if is_reviewed and i ~= M.state.current_index then
+        table.insert(highlights, {
+          line = #lines - 1,
+          col = #prefix + #reviewed_part + #status_info.icon + 1,
+          end_col = -1,
+          hl_group = "Comment",
+        })
+      end
+
       -- Highlight stats if present
-      if stats_part ~= "" then
-        -- Find position of stats in the line (before comment part)
+      if stats_part ~= "" and not is_reviewed then
         local stats_col = #line - #comment_part - #stats_part
 
-        -- Highlight additions
         if stats and stats.additions > 0 then
           local add_str = "+" .. tostring(stats.additions)
           local add_pos = line:find("%+" .. tostring(stats.additions), stats_col, true)
@@ -565,7 +622,6 @@ function M.render()
           end
         end
 
-        -- Highlight deletions
         if stats and stats.deletions > 0 then
           local del_str = "-" .. tostring(stats.deletions)
           local del_pos = line:find("%-" .. tostring(stats.deletions), stats_col, true)
@@ -581,7 +637,7 @@ function M.render()
       end
 
       -- Highlight comment count if present
-      if comment_count > 0 then
+      if comment_count > 0 and not is_reviewed then
         local comment_col = #line - #comment_part
         table.insert(highlights, {
           line = #lines - 1,
@@ -904,6 +960,61 @@ end
 
 function M.close_fold()
   set_fold_state(false)
+end
+
+-- Toggle reviewed status for the current file
+function M.toggle_reviewed()
+  if #M.state.files == 0 then
+    return
+  end
+
+  local file = M.state.files[M.state.current_index]
+  if not file then
+    return
+  end
+
+  if M.state.reviewed[file.path] then
+    M.state.reviewed[file.path] = nil
+  else
+    M.state.reviewed[file.path] = true
+  end
+
+  schedule_render()
+
+  -- Trigger auto-save so reviewed state persists
+  local reviews = require("diff-review.reviews")
+  reviews.save_current()
+end
+
+-- Get reviewed file paths as a list (for persistence)
+function M.get_reviewed_files()
+  local files = {}
+  for path, _ in pairs(M.state.reviewed) do
+    table.insert(files, path)
+  end
+  return files
+end
+
+-- Set reviewed files from a list (for persistence)
+function M.set_reviewed_files(files)
+  M.state.reviewed = {}
+  if files then
+    for _, path in ipairs(files) do
+      M.state.reviewed[path] = true
+    end
+  end
+end
+
+-- Get review progress counts
+function M.get_progress()
+  local total = #M.state.files
+  local reviewed = 0
+  for _, file in ipairs(M.state.files) do
+    if M.state.reviewed[file.path] then
+      reviewed = reviewed + 1
+    end
+  end
+  return reviewed, total
 end
 
 return M
