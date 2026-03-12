@@ -29,10 +29,11 @@ function M.statuscolumn()
     return string.format("%%#LineNr#%s %" .. w .. "d%%#NonText#│%%*", pad, entry.new_line)
   elseif entry.type == "delete" then
     return string.format("%%#LineNr#%" .. w .. "d %s%%#NonText#│%%*", entry.old_line, pad)
-  elseif entry.type == "header" then
+  elseif entry.type == "hunk" then
     return "%#NonText#" .. sep .. "│%*"
   end
 
+  -- File metadata lines: no gutter
   return ""
 end
 
@@ -412,7 +413,7 @@ local function build_line_mapping(diff_output)
       new_file_line = tonumber(new_start)
       old_file_line = tonumber(old_start)
       mapping[display_line] = {
-        type = "header",
+        type = "hunk",
         file_line = nil,
         old_line = old_file_line,
         new_line = new_file_line,
@@ -446,9 +447,9 @@ local function build_line_mapping(diff_output)
         new_file_line = new_file_line + 1
         old_file_line = old_file_line + 1
       else
-        -- Other lines (file headers, etc)
+        -- File metadata lines (diff --git, index, ---, +++)
         mapping[display_line] = {
-          type = "header",
+          type = "meta",
           file_line = nil,
         }
       end

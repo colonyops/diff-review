@@ -280,12 +280,16 @@ local function resolve_file_at_cursor()
     return nil, "Cannot navigate to deleted line"
   end
 
-  if line_info.type == "header" then
+  if line_info.type == "hunk" then
     if line_info.new_line then
       line_info.file_line = line_info.new_line
     else
-      return nil, "Cannot navigate from metadata line"
+      return nil, "Cannot navigate from hunk header"
     end
+  end
+
+  if line_info.type == "meta" then
+    return nil, "Cannot navigate from metadata line"
   end
 
   if file.status == "D" then
