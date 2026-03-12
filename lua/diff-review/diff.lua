@@ -21,7 +21,6 @@ function M.statuscolumn()
 
   local w = M._line_num_width
   local pad = string.rep(" ", w)
-  local sep = string.rep("─", w * 2 + 1)
 
   if entry.type == "context" then
     return string.format("%%#LineNr#%" .. w .. "d %" .. w .. "d%%#NonText#│%%*", entry.old_line, entry.new_line)
@@ -29,11 +28,8 @@ function M.statuscolumn()
     return string.format("%%#LineNr#%s %" .. w .. "d%%#NonText#│%%*", pad, entry.new_line)
   elseif entry.type == "delete" then
     return string.format("%%#LineNr#%" .. w .. "d %s%%#NonText#│%%*", entry.old_line, pad)
-  elseif entry.type == "hunk" then
-    return "%#NonText#" .. sep .. "│%*"
   end
 
-  -- File metadata lines: no gutter
   return ""
 end
 
