@@ -137,8 +137,10 @@ function M.open(review_type, base, head, pr_number, separator)
 
   -- Set window options for diff
   vim.api.nvim_win_set_option(M.state.diff_win, "wrap", false)
-  vim.api.nvim_win_set_option(M.state.diff_win, "number", true)
+  vim.api.nvim_win_set_option(M.state.diff_win, "number", false)
   vim.api.nvim_win_set_option(M.state.diff_win, "relativenumber", false)
+  vim.api.nvim_win_set_option(M.state.diff_win, "statuscolumn",
+    "%!v:lua.require('diff-review.diff').statuscolumn()")
 
   -- Setup keymaps
   M.setup_keymaps()

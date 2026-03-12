@@ -4,6 +4,37 @@ local config = require("diff-review.config")
 
 -- Module-level line mapping cache
 M._line_mapping = nil
+M._line_num_width = 4  -- Width for formatting line numbers
+
+-- Statuscolumn function for diff line numbers
+-- Shows old and new file line numbers instead of buffer line numbers
+function M.statuscolumn()
+  local lnum = vim.v.lnum
+  if not M._line_mapping then
+    return ""
+  end
+
+  local entry = M._line_mapping[lnum]
+  if not entry then
+    return ""
+  end
+
+  local w = M._line_num_width
+  local pad = string.rep(" ", w)
+  local sep = string.rep("─", w * 2 + 1)
+
+  if entry.type == "context" then
+    return string.format("%%#LineNr#%" .. w .. "d %" .. w .. "d%%#NonText#│%%*", entry.old_line, entry.new_line)
+  elseif entry.type == "add" then
+    return string.format("%%#LineNr#%s %" .. w .. "d%%#NonText#│%%*", pad, entry.new_line)
+  elseif entry.type == "delete" then
+    return string.format("%%#LineNr#%" .. w .. "d %s%%#NonText#│%%*", entry.old_line, pad)
+  elseif entry.type == "header" then
+    return "%#NonText#" .. sep .. "│%*"
+  end
+
+  return ""
+end
 
 -- Execute git command and return output
 local function exec_cmd(cmd)
@@ -425,6 +456,18 @@ local function build_line_mapping(diff_output)
     display_line = display_line + 1
   end
 
+  -- Compute max line number for column width
+  local max_line = 0
+  for _, entry in pairs(mapping) do
+    if entry.old_line and entry.old_line > max_line then
+      max_line = entry.old_line
+    end
+    if entry.new_line and entry.new_line > max_line then
+      max_line = entry.new_line
+    end
+  end
+  M._line_num_width = math.max(3, #tostring(max_line))
+
   return mapping
 end
 
@@ -453,6 +496,7 @@ end
 -- Clear line mapping cache
 function M.clear_line_mapping()
   M._line_mapping = nil
+  M._line_num_width = 4
 end
 
 -- Parse diff output into structured format
